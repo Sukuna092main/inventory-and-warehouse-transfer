@@ -2,7 +2,7 @@
 
 **Phiên bản:** 0.4  
 **Ngày:** 2026-09-22  
-**Trạng thái:** Đã có entity và migration cho ba bảng, kiểm tra schema đạt; chờ người dùng chạy migration vào `auth_db`. Các quy tắc API chưa triển khai.  
+**Trạng thái:** Đã có entity, migration và ba bảng trong `auth_db`; kiểm tra schema đạt. Các quy tắc API chưa triển khai.  
 **Database:** `auth_db`  
 **Tài khoản kết nối của service:** `auth_user`  
 **Căn cứ:** [SRS 1.1](../SRS_Inventory_Warehouse_Transfer_System_VI.md), mục 2.4, FR-AUTH-01–03, BR-15, mục 9.1/9.10/10/11.1/11.7 và NFR-06.
@@ -57,7 +57,7 @@ Mỗi dòng tương ứng một người dùng ứng dụng. Các độ dài tr�
 
 - `status` chỉ nhận `ACTIVE` hoặc `INACTIVE`, có CHECK tại database. Tài khoản INACTIVE không được đăng nhập hoặc thực hiện nghiệp vụ theo FR-AUTH-03.
 - MVP vô hiệu hóa tài khoản bằng trạng thái; không cung cấp chức năng xóa vật lý người dùng.
-- `password_hash` không rỗng và không được đưa vào response API hoặc audit. Thuật toán/thư viện băm sẽ được chọn ở bước triển khai đăng nhập.
+- `password_hash` không rỗng và không được đưa vào response API hoặc audit. Bước seed dùng scrypt có sẵn trong Node.js, salt ngẫu nhiên, N=131072/r=8/p=1; hàm băm và kiểm tra mật khẩu dùng chung cho bước đăng nhập sau này. Xem [seed Admin](./seed-admin.md).
 - Khi tạo: `created_at` và `updated_at` được khởi tạo. Khi chỉnh sửa thông tin, quyền hoặc đổi mật khẩu: service cập nhật `updated_at` trong cùng transaction. `DEFAULT CURRENT_TIMESTAMP` không tự cập nhật cột mỗi lần sửa dòng.
 - API xuất thời điểm theo UTC; giao diện hiển thị theo múi giờ người dùng.
 
@@ -241,6 +241,6 @@ Sự kiện là `USER_UPDATED`, có ID Admin thực hiện và thời điểm gh
 
 ## 5. Bước tiếp theo
 
-Ngày 2026-09-22 đã có entity và migration ba bảng Auth, cùng 39 ca kiểm tra schema trên PostgreSQL thật. Bước hiện tại là người dùng chạy migration theo [hướng dẫn tạo bảng](./auth-database-migration.md), rồi kiểm tra trong pgAdmin. Giữ `synchronize: false`. Sau khi xác nhận bảng đã tạo mới chuyển sang bước tài khoản Admin/đăng nhập; các checklist nghiệp vụ phía trên không được coi là hoàn thành chỉ vì schema đã có.
+Ngày 2026-09-22 đã có entity và migration ba bảng Auth, cùng 39 ca kiểm tra schema trên PostgreSQL thật. Người dùng đã chạy migration; kiểm tra chỉ đọc xác nhận bảng, lịch sử migration và trigger bảo vệ audit. Xem [hướng dẫn tạo bảng](./auth-database-migration.md). Giữ `synchronize: false`. Người dùng đã chạy [seed Admin](./seed-admin.md); kiểm tra xác nhận 1 Admin ACTIVE và 1 audit tương ứng. Bước tiếp theo là API đăng nhập. Các checklist API phía trên chưa được coi là hoàn thành từ bước seed.
 
 Các tham khảo kỹ thuật: [UUID](https://www.postgresql.org/docs/17/datatype-uuid.html), [ràng buộc PostgreSQL](https://www.postgresql.org/docs/17/ddl-constraints.html), [khóa bản ghi](https://www.postgresql.org/docs/17/explicit-locking.html), [JSON/JSONB](https://www.postgresql.org/docs/17/datatype-json.html), [hàm thời gian](https://www.postgresql.org/docs/17/functions-datetime.html) và [trigger](https://www.postgresql.org/docs/17/sql-createtrigger.html).

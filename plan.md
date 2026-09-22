@@ -2,9 +2,9 @@
 
 **Nền tảng:** Web và Android  
 **Phiên bản kế hoạch:** 1.0  
-**Ngày cập nhật:** 2026-09-22  
+**Ngày cập nhật:** 2026-09-23  
 **Tài liệu nghiệp vụ hiện hành:** [SRS phiên bản 1.1](./SRS_Inventory_Warehouse_Transfer_System_VI.md)  
-**Trạng thái dự án:** Auth đã kết nối PostgreSQL, entity/migration ba bảng đã kiểm tra; chờ chạy migration thủ công, chưa có nghiệp vụ đăng nhập  
+**Trạng thái dự án:** Auth đã kết nối PostgreSQL và tạo ba bảng nghiệp vụ bằng migration; chưa có nghiệp vụ đăng nhập  
 **Thời gian mục tiêu:** 8 tuần, điều chỉnh theo tiến độ thực tế
 
 > Đây là tài liệu để cùng học, thống nhất và theo dõi công việc. Các công việc trong kế hoạch không đồng nghĩa với việc sẽ được tự động triển khai toàn bộ ngay lập tức.
@@ -30,6 +30,7 @@
 - Cùng thống nhất một phần nhỏ rồi mới thực hiện. Không tự chuyển từ viết tài liệu sang tạo code, cài dependency hoặc chạy toàn bộ lộ trình.
 - Người dùng thực hiện thủ công các bước cài công cụ/dependency, khởi tạo bằng CLI và setup hạ tầng theo hướng dẫn. Trợ lý kiểm tra kết quả, giải thích và hỗ trợ viết mã cho phần đã thống nhất.
 - Sau mỗi phần, giải thích cách hoạt động, cách kiểm tra và kết quả thực tế; cập nhật tiến độ trong file này rồi mới bàn bước tiếp theo.
+- Với mỗi file tạo hoặc sửa, giải thích vai trò của file, vì sao cần nó và cách nó phối hợp với các file khác; dùng lời giải thích dễ hiểu để người dùng theo kịp quá trình học.
 - Ưu tiên hiểu và chạy được từng luồng nghiệp vụ. Không đặt mục tiêu tạo thật nhiều file trong một lần.
 - Nếu phát hiện cần thay đổi phạm vi hoặc công nghệ đã chọn, ghi nhận lý do và trao đổi trước khi thay đổi.
 - Các mốc tuần là thứ tự và mục tiêu tham khảo, không phải hạn tự động. Chưa xác định số giờ làm việc mỗi tuần hoặc ngày bàn giao cố định.
@@ -243,7 +244,8 @@ Tất cả nhóm chức năng dưới đây đều có trên cả web và Androi
 | PREP-09 | PostgreSQL local, pgAdmin và database/tài khoản Auth | DONE | Người dùng xác nhận ngày 2026-09-18 đã hoàn tất các bước kiểm tra; kết nối 127.0.0.1:5433, database auth_db, tài khoản auth_user |
 | PREP-10 | Kết nối NestJS với auth_db | DONE | Kiểm tra ngày 2026-09-22 qua TypeORM DataSource của Nest: auth_db / auth_user, 0 bảng public; synchronize và migrationsRun đều false. Build, unit test và lint đạt; xem docs/auth-database-connection.md |
 | PREP-11 | Tạo thư mục giữ chỗ cho các thành phần còn lại | DONE | Ngày 2026-09-22: bốn service, Gateway, web và mobile có README mô tả trách nhiệm và trạng thái Chưa triển khai; chưa khởi tạo ứng dụng hoặc cấu hình workspace |
-| PREP-12 | Entity và migration đầu tiên cho Auth | IN_PROGRESS | Mã nguồn và 39 ca kiểm tra PostgreSQL đã đạt; build, lint, unit/e2e đạt. Chờ người dùng chạy migration và xác nhận bốn bảng (ba nghiệp vụ + auth_migrations); xem docs/auth-database-migration.md |
+| PREP-12 | Entity và migration đầu tiên cho Auth | DONE | Người dùng đã chạy migration; kiểm tra chỉ đọc ngày 2026-09-22 xác nhận ba bảng nghiệp vụ, auth_migrations, bản ghi CreateAuthTables1790035200000 và trigger bảo vệ audit đang bật. Trước đó 39 ca kiểm tra PostgreSQL, build, lint, unit/e2e đạt; xem docs/auth-database-migration.md |
+| PREP-13 | Seed Admin đầu tiên từ cấu hình local | DONE | Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Unit test và 8 ca seed trên PostgreSQL đã đạt, bao gồm chạy đồng thời; xem docs/seed-admin.md |
 
 ### 5.2. Theo dõi triển khai theo chức năng
 
@@ -403,20 +405,21 @@ Khi đồng bộ, rà lại toàn bộ các chỗ đề cập “frontend” đ�
 | DEC-10 | 2026-09-17 | Tài liệu theo dõi tên `plan.md` | Theo yêu cầu mới nhất; dùng thay tên `DEVELOPMENT_PLAN.md` trước đó |
 | DEC-11 | 2026-09-19 | Giữ GPS ngoài phạm vi; tiếp tục theo dõi trạng thái phiếu, lịch sử xử lý và biến động tồn | Người dùng quyết định không bổ sung tracking GPS sau khi trao đổi phạm vi và chi phí |
 | DEC-12 | 2026-09-19 | Xem thiết kế database tổng thể 5 service trước, sau đó chi tiết và code từng phần | Người dùng đồng ý cách làm tổng quan trước; Inventory và Transfer được thiết kế nghiệp vụ cùng nhau, triển khai từng chức năng nhỏ |
+| DEC-13 | 2026-09-22 | Seed Admin đọc SEED_ADMIN_* từ .env; băm bằng scrypt có sẵn trong Node.js | Người dùng muốn file seed để tiện test API và nhớ thông tin local; không thêm dependency, không hardcode mật khẩu, không reset tài khoản đã có |
 
 Khi có quyết định mới, thêm một dòng thay vì âm thầm đổi lựa chọn cũ. Nếu thay đổi yêu cầu nghiệp vụ, cập nhật cả SRS ở bước tương ứng.
 
 ## 11. Bước tiếp theo
 
-**Mốc vừa hoàn thành:** Đã viết ba entity Auth và migration `CreateAuthTables1790035200000`. Kiểm tra PostgreSQL 39 ca, build, lint, unit/e2e đạt. Các schema thử nghiệm được rollback hoàn toàn; `public` chưa có bảng. Mật khẩu do người dùng quản lý trong cấu hình local, không ghi vào tài liệu. FEAT-01 vẫn TODO.
+**Mốc vừa hoàn thành:** Người dùng đã chạy `seed:admin`. Kiểm tra chỉ đọc xác nhận có 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Mật khẩu do người dùng quản lý trong cấu hình local, không ghi vào tài liệu. FEAT-01 vẫn TODO vì API đăng nhập chưa triển khai.
 
-**Bước hiện tại: người dùng chạy migration thủ công và kiểm tra bảng trong pgAdmin theo [hướng dẫn](./docs/auth-database-migration.md).**
+**Bước hiện tại: chuẩn bị dependency cho API đăng nhập `POST /api/auth/login`.** Auth chưa có `@nestjs/jwt`, `class-validator`, `class-transformer`; người dùng cài thủ công bằng `pnpm add --save-exact --strict-peer-dependencies @nestjs/jwt class-validator class-transformer` tại `services/auth-service`. Sau khi cài, kiểm tra phiên bản tương thích NestJS 12 rồi triển khai API, giải thích vai trò từng file và hướng dẫn test. Chưa viết endpoint hoặc đánh dấu FEAT-01 hoàn thành.
 
 - Đọc [database tổng quan](./docs/database-overview.md): service sở hữu từng nhóm bảng, quan hệ nội bộ/liên service, command/result và ví dụ chuyển kho.
 - Có thể dán [database.dbml](./docs/database.dbml) vào dbdiagram để xem 26 bảng trong 5 nhóm service. Nét đứt chỉ là tham chiếu logic liên service; các cột ngoài Auth còn là đề xuất, không xuất nguyên sơ đồ thành migration.
 - DBML v0.2 sửa ký hiệu nullable và quan hệ một–một theo warning người dùng gửi từ dbdiagram; không đổi cột hoặc constraint nghiệp vụ. Người dùng đã xác nhận bản mới ổn trên dbdiagram ngày 2026-09-22.
 - Bản tổng quan ghi cả các bảng chống trùng, outbox và tham chiếu sử dụng danh mục; các đề xuất kỹ thuật và điểm nghiệp vụ còn cần chốt được ghi rõ, chưa được coi là schema đã triển khai.
-- [Thiết kế ba bảng Auth](./docs/auth-database-design.md) đã có entity và migration được kiểm tra. Giữ `synchronize: false`; chỉ chuyển sang tài khoản Admin/đăng nhập sau khi xác nhận bảng đã tạo.
+- [Thiết kế ba bảng Auth](./docs/auth-database-design.md) đã có entity và migration được kiểm tra, bảng đã tạo thành công. Giữ `synchronize: false`; triển khai tài khoản Admin/đăng nhập theo từng bước nhỏ.
 - Hoàn thiện chi tiết và triển khai theo thứ tự Auth → Product → Warehouse → Inventory và Transfer. Hai service cuối thiết kế nghiệp vụ cùng nhau, code từng chức năng.
 
 Điều kiện hoàn thành bước tổng quan: cùng thống nhất quyền sở hữu dữ liệu, các nhóm bảng, tham chiếu giữa service và luồng cập nhật chính; ghi rõ điểm cần giải quyết ở thiết kế chi tiết. PREP-05 vẫn IN_PROGRESS cho tới khi thiết kế dữ liệu và hợp đồng liên quan được hoàn thiện. Tài liệu chưa được coi là schema đã triển khai hoặc chức năng đăng nhập đã hoàn thành.

@@ -230,4 +230,4 @@ Các điểm trên được ghi để không bỏ sót; chưa tự chọn quy t�
 
 Đã có bản nháp tổng quan cho cả năm service và bản nháp chi tiết Auth. PREP-05 vẫn IN_PROGRESS vì schema chi tiết và hợp đồng API/message toàn hệ thống chưa hoàn tất; chưa đánh dấu chức năng Backend/Web/Android nào DONE từ tài liệu này.
 
-Ngày 2026-09-22, Auth đã kết nối `auth_db` với `synchronize: false`, bổ sung entity/migration ba bảng và kiểm tra PostgreSQL đạt. Bước hiện tại là người dùng chạy migration theo [hướng dẫn tạo bảng Auth](./auth-database-migration.md). Việc tạo thêm database/tài khoản và cài công cụ vẫn do người dùng thực hiện thủ công theo hướng dẫn.
+Ngày 2026-09-22, Auth đã kết nối `auth_db` với `synchronize: false`, bổ sung entity/migration ba bảng và kiểm tra PostgreSQL đạt. Người dùng đã chạy migration; đã xác nhận đủ bảng và lịch sử migration theo [hướng dẫn tạo bảng Auth](./auth-database-migration.md). Bước tiếp theo là khởi tạo Admin đầu tiên rồi triển khai API đăng nhập. Việc tạo thêm database/tài khoản và cài công cụ vẫn do người dùng thực hiện thủ công theo hướng dẫn.
