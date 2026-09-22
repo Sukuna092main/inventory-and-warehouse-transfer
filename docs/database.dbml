@@ -1,0 +1,597 @@
+// Inventory & Warehouse Transfer System — bản nháp trực quan v0.2, 2026-09-19.
+// Nguồn: database-overview.md, auth-database-design.md, SRS 1.1.
+// Dán toàn bộ file vào trình soạn thảo DBML của https://dbdiagram.io.
+// *_db là namespace để biểu diễn 5 DATABASE RIÊNG trên cùng một sơ đồ.
+// Không có nghĩa là triển khai 5 schema trong một database.
+// Nét liền / FK_*: quan hệ nội bộ trong một database.
+// Nét đứt màu cam / LOGICAL_*: chỉ tham chiếu ID qua API/message, KHÔNG tạo FK chéo DB.
+// [inactive] là thiết lập hiển thị; không dựa vào nó để loại FK khi export SQL.
+// Không dùng SQL export toàn bộ sơ đồ làm migration. Tách theo service, bỏ LOGICAL_*,
+// bổ sung các constraint/trigger và quy tắc còn được ghi bằng Note trước khi triển khai.
+// UUID do backend sinh. Cột/kiểu/độ dài ngoài Auth là đề xuất phục vụ xem tổng quan.
+// Cardinality: ?>? = nhiều–một, cả hai đầu có thể không có bản ghi liên quan.
+// Parent -? Child = một parent có 0 hoặc 1 child; child bắt buộc có parent.
+// Parent ?-? Child = một–một tùy chọn cả hai phía; cột FK nằm ở phía Child.
+
+Project inventory_warehouse_transfer {
+  database_type: 'PostgreSQL'
+  Note: '''
+  BẢN NHÁP ĐỂ THẢO LUẬN — chưa tạo database hoặc migration.
+  Mỗi nhóm màu là một service sở hữu database riêng.
+  Nét liền: FK nội bộ. Nét đứt màu cam: tham chiếu logic qua API/message.
+  Auth dựa trên bản thiết kế v0.3; phần còn lại là ánh xạ SRS và đề xuất sơ bộ.
+  integer cho số lượng chỉ là kiểu minh họa; giới hạn DB/API/TypeScript chưa chốt.
+  Không chứa GPS, refresh token hoặc dữ liệu demo/mật khẩu thực tế.
+  '''
+}
+
+// Các partial chỉ rút gọn file DBML; hai service vẫn có bảng và migration riêng.
+TablePartial outbox_fields {
+  event_id uuid [pk, not null]
+  event_type varchar(100) [not null]
+  schema_version integer [not null, default: 1]
+  aggregate_id uuid [not null, note: 'ID tài nguyên nghiệp vụ; ý nghĩa tùy event_type.']
+  operation_id uuid [note: 'Có khi message thuộc một thao tác; không phải FK chung.']
+  correlation_id varchar(128) [not null]
+  occurred_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  exchange_name varchar(100) [not null]
+  routing_key varchar(100) [not null]
+  payload jsonb [not null]
+  status varchar(24) [not null, default: 'PENDING', note: 'Đề xuất: PENDING/PUBLISHED; confirm thất lạc có thể gây phát lại.']
+  attempt_count integer [not null, default: 0]
+  next_attempt_at timestamptz
+  published_at timestamptz
+  last_error text
+}
+
+TablePartial processed_message_fields {
+  consumer_name varchar(100) [not null]
+  event_id uuid [not null]
+  operation_id uuid
+  payload_hash varchar(64) [not null, note: 'Đề xuất hash payload chuẩn hóa; cùng ID khác nội dung phải bị phát hiện.']
+  processed_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (consumer_name, event_id) [pk]
+  }
+}
+
+TablePartial idempotency_fields {
+  id uuid [pk, not null]
+  actor_id uuid [not null, note: 'Tham chiếu logic Auth.users.id.']
+  request_scope varchar(255) [not null, note: 'HTTP method + endpoint có ID tài nguyên cụ thể, đã chuẩn hóa.']
+  idempotency_key varchar(128) [not null]
+  payload_hash varchar(64) [not null]
+  resource_type varchar(32)
+  resource_id uuid [note: 'Tham chiếu đa hình tới resource tạo/đổi; không có FK chung.']
+  operation_id uuid [note: 'Nullable; các thao tác đồng bộ không nhất thiết có transfer operation.']
+  response_status smallint
+  response_body jsonb [note: 'Operation còn chạy: trả trạng thái hiện hành qua operation_id.']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (actor_id, request_scope, idempotency_key) [unique]
+  }
+}
+
+TablePartial resource_usage_task_fields {
+  id uuid [pk, not null]
+  owner_resource_type varchar(32) [not null]
+  owner_resource_id uuid [not null, note: 'ID nghiệp vụ hoặc ý định đã lưu bền vững; có thể chưa có resource hoàn tất.']
+  operation_id uuid
+  target_service varchar(32) [not null, note: 'PRODUCT hoặc WAREHOUSE.']
+  target_resource_id uuid [not null, note: 'ID sản phẩm/kho; liên kết đa hình qua API, không FK.']
+  reference_id uuid [not null, note: 'ID đăng ký tại service sở hữu; mỗi vòng sử dụng mới có ID riêng.']
+  task_type varchar(24) [not null, note: 'Đề xuất: REGISTER/CONFIRM/RELEASE.']
+  status varchar(24) [not null, default: 'PENDING', note: 'Vòng đời task và thứ tự xử lý còn cần thiết kế chi tiết.']
+  request_payload jsonb [not null]
+  attempt_count integer [not null, default: 0]
+  next_attempt_at timestamptz
+  last_error text
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (reference_id, task_type) [unique]
+  }
+}
+
+// AUTH — chi tiết dựa trên auth-database-design.md v0.3.
+Table auth_db.users {
+  id uuid [pk, not null]
+  username varchar(50) [not null, unique, note: 'Trim, chữ thường; 3–50 ký tự; không có @.']
+  email varchar(254) [not null, unique, note: 'Trim, chữ thường; kiểm tra định dạng tại backend.']
+  password_hash text [not null, note: 'Chỉ hash; không trả qua API hoặc lưu vào audit.']
+  role varchar(32) [not null]
+  assigned_warehouse_id uuid [note: 'LOGICAL: warehouse_db.warehouses.id; bắt buộc với Manager/Staff.']
+  status varchar(16) [not null, default: 'ACTIVE']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`, note: 'Backend cập nhật khi dữ liệu thay đổi.']
+  indexes {
+    assigned_warehouse_id
+  }
+  checks {
+    `role IN ('ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF')` [name: 'chk_users_role']
+    `status IN ('ACTIVE', 'INACTIVE')` [name: 'chk_users_status']
+    `role = 'ADMIN' OR assigned_warehouse_id IS NOT NULL` [name: 'chk_users_assigned_warehouse']
+    `username = lower(btrim(username)) AND username ~ '^[a-z0-9][a-z0-9._-]{2,49}$'` [name: 'chk_users_username']
+    `email = lower(btrim(email)) AND length(email) > 0` [name: 'chk_users_email']
+    `length(btrim(password_hash)) > 0` [name: 'chk_users_password_hash']
+  }
+  Note: 'Auth sở hữu tài khoản. Kho ACTIVE được xác minh qua Warehouse; không có FK liên database. Disable giữ username/email và lịch sử.'
+}
+
+Table auth_db.user_permissions {
+  user_id uuid [not null]
+  permission varchar(32) [not null]
+  granted_by uuid [not null, note: 'Admin đã xác thực; backend tự gán.']
+  granted_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (user_id, permission) [pk]
+  }
+  checks {
+    `permission IN ('VIEW_OTHER_INVENTORY', 'SHIP_TRANSFER', 'RECEIVE_TRANSFER', 'ADJUST_INVENTORY')` [name: 'chk_user_permissions_code']
+  }
+  Note: 'Chỉ lưu quyền bổ sung. Auth kiểm tra quyền phù hợp với role; service nghiệp vụ kiểm tra phạm vi kho. Không sao chép quyền mặc định của role thành dòng.'
+}
+
+Table auth_db.user_audit_logs {
+  id uuid [pk, not null]
+  user_id uuid [not null]
+  actor_type varchar(16) [not null]
+  actor_id uuid [note: 'NULL chỉ cho SYSTEM khi bootstrap Admin.']
+  action varchar(32) [not null]
+  before_data jsonb [note: 'SQL NULL khi USER_CREATED; các trường hợp khác là object.']
+  after_data jsonb [not null]
+  correlation_id varchar(128) [not null]
+  created_at timestamptz [not null, default: `clock_timestamp()`]
+  indexes {
+    (created_at, id) [note: 'Truy vấn DESC; chiều index cụ thể chốt trong migration.']
+    (user_id, created_at, id)
+  }
+  checks {
+    `actor_type IN ('USER', 'SYSTEM')` [name: 'chk_user_audit_actor_type']
+    `action IN ('USER_CREATED', 'USER_UPDATED', 'USER_PASSWORD_CHANGED')` [name: 'chk_user_audit_action']
+    `(actor_type = 'USER' AND actor_id IS NOT NULL) OR (actor_type = 'SYSTEM' AND actor_id IS NULL AND action = 'USER_CREATED')` [name: 'chk_user_audit_actor']
+    `(action = 'USER_CREATED' AND before_data IS NULL) OR (action <> 'USER_CREATED' AND before_data IS NOT NULL AND jsonb_typeof(before_data) = 'object')` [name: 'chk_user_audit_before']
+    `jsonb_typeof(after_data) = 'object'` [name: 'chk_user_audit_after']
+    `length(btrim(correlation_id)) > 0` [name: 'chk_user_audit_correlation']
+  }
+  Note: 'Append-only. Snapshot chỉ chứa username, email, role, assigned_warehouse_id, status, additional_permissions. Không mật khẩu/hash/token. Migration còn cần trigger chặn UPDATE/DELETE/TRUNCATE; audit cùng transaction với thay đổi.'
+}
+
+// PRODUCT — kiểu/độ dài và các cột hỗ trợ là đề xuất sơ bộ.
+Table product_db.products {
+  id uuid [pk, not null]
+  sku varchar(64) [not null, unique, note: 'Trim, chữ hoa; không sửa SKU trong MVP.']
+  name varchar(255) [not null]
+  category varchar(100) [not null]
+  unit varchar(50) [not null]
+  description text
+  status varchar(16) [not null, default: 'ACTIVE']
+  unit_locked_at timestamptz [note: 'ĐỀ XUẤT dấu sử dụng đã xác nhận; không xóa khi giải phóng tham chiếu.']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `status IN ('ACTIVE', 'INACTIVE')` [name: 'chk_products_status']
+    `sku = upper(btrim(sku)) AND length(sku) > 0` [name: 'chk_products_sku']
+  }
+  Note: 'Category/unit là thuộc tính, chưa có bảng CRUD riêng. Khóa unit sau khi có Inventory/giao dịch; giao thức xác nhận sử dụng cần chốt. Vô hiệu hóa tuân theo BR-16.'
+}
+
+Table product_db.product_audit_logs {
+  id uuid [pk, not null]
+  product_id uuid [not null]
+  actor_id uuid [not null, note: 'LOGICAL: auth_db.users.id.']
+  action varchar(32) [not null]
+  before_data jsonb
+  after_data jsonb [not null]
+  correlation_id varchar(128) [not null]
+  created_at timestamptz [not null, default: `clock_timestamp()`]
+  indexes {
+    (product_id, created_at, id)
+  }
+  Note: 'Đề xuất cấu trúc audit; append-only và cùng transaction với cập nhật sản phẩm.'
+}
+
+Table product_db.product_usage_references {
+  id uuid [pk, not null, note: 'ID đăng ký do bên sử dụng giữ bền vững để retry.']
+  product_id uuid [not null]
+  owner_service varchar(32) [not null, note: 'INVENTORY hoặc TRANSFER; không FK tới DB bên sử dụng.']
+  owner_resource_type varchar(32) [not null]
+  owner_resource_id uuid [not null]
+  request_hash varchar(64) [not null]
+  status varchar(24) [not null, note: 'Đề xuất: REGISTERED/CONFIRMED/RELEASED; giao thức chưa chốt.']
+  registered_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  confirmed_at timestamptz
+  released_at timestamptz
+  indexes {
+    (product_id, status)
+  }
+  Note: 'Đề xuất thực hiện BR-16. Đăng ký và disable cùng khóa product. Không giải phóng do timeout; giữ dấu sử dụng lịch sử. Không phục hồi tham chiếu đã RELEASED bằng một đăng ký cũ đến muộn.'
+}
+
+// WAREHOUSE.
+Table warehouse_db.warehouses {
+  id uuid [pk, not null]
+  code varchar(64) [not null, unique, note: 'Trim, chữ hoa; không sửa mã kho trong MVP.']
+  name varchar(255) [not null]
+  address text [not null]
+  status varchar(16) [not null, default: 'ACTIVE']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `status IN ('ACTIVE', 'INACTIVE')` [name: 'chk_warehouses_status']
+    `code = upper(btrim(code)) AND length(code) > 0` [name: 'chk_warehouses_code']
+  }
+  Note: 'Disable tuân theo BR-16; không xóa kho có giao dịch. Cần chốt quy tắc với kho còn Manager/Staff được phân công.'
+}
+
+Table warehouse_db.warehouse_audit_logs {
+  id uuid [pk, not null]
+  warehouse_id uuid [not null]
+  actor_id uuid [not null, note: 'LOGICAL: auth_db.users.id.']
+  action varchar(32) [not null]
+  before_data jsonb
+  after_data jsonb [not null]
+  correlation_id varchar(128) [not null]
+  created_at timestamptz [not null, default: `clock_timestamp()`]
+  indexes {
+    (warehouse_id, created_at, id)
+  }
+  Note: 'Đề xuất cấu trúc audit; append-only và cùng transaction với cập nhật kho.'
+}
+
+Table warehouse_db.warehouse_usage_references {
+  id uuid [pk, not null]
+  warehouse_id uuid [not null]
+  owner_service varchar(32) [not null, note: 'INVENTORY hoặc TRANSFER; tham chiếu logic.']
+  owner_resource_type varchar(32) [not null]
+  owner_resource_id uuid [not null]
+  request_hash varchar(64) [not null]
+  status varchar(24) [not null, note: 'Đề xuất: REGISTERED/CONFIRMED/RELEASED.']
+  registered_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  confirmed_at timestamptz
+  released_at timestamptz
+  indexes {
+    (warehouse_id, status)
+  }
+  Note: 'Đề xuất cho BR-16. Đăng ký và disable cùng khóa warehouse; đối soát khi lỗi. Mỗi vòng sử dụng mới có ID khác; giữ trạng thái đã giải phóng để chặn message/request cũ.'
+}
+
+// INVENTORY — integer chỉ là kiểu minh họa, giới hạn số lượng sẽ chốt riêng.
+Table inventory_db.inventory_balances {
+  id uuid [pk, not null]
+  warehouse_id uuid [not null, note: 'LOGICAL: warehouse_db.warehouses.id.']
+  product_id uuid [not null, note: 'LOGICAL: product_db.products.id.']
+  quantity integer [not null, default: 0]
+  reserved_quantity integer [not null, default: 0]
+  minimum_stock_level integer [note: 'TÙY CHỌN theo FR-INV-08; không bắt buộc trong MVP.']
+  version integer [not null, default: 1]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (warehouse_id, product_id) [unique]
+  }
+  checks {
+    `quantity >= 0 AND reserved_quantity >= 0 AND reserved_quantity <= quantity` [name: 'chk_inventory_balance']
+    `minimum_stock_level IS NULL OR minimum_stock_level >= 0` [name: 'chk_inventory_minimum']
+    `version > 0` [name: 'chk_inventory_version']
+  }
+  Note: 'available = quantity - reserved_quantity, không lưu cột do client sửa. Khóa theo thứ tự cố định; toàn bộ dòng hàng cùng transaction. Receive đầu tiên có thể tạo balance.'
+}
+
+Table inventory_db.stock_reservations {
+  id uuid [pk, not null]
+  transfer_id uuid [not null, note: 'LOGICAL: transfer_db.transfers.id.']
+  product_id uuid [not null]
+  source_warehouse_id uuid [not null]
+  quantity integer [not null]
+  status varchar(16) [not null]
+  reserve_operation_id uuid [not null, note: 'LOGICAL: transfer_db.transfer_operations.id.']
+  last_operation_id uuid [not null, note: 'LOGICAL: transfer_db.transfer_operations.id.']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  indexes {
+    (transfer_id, product_id) [unique]
+  }
+  checks {
+    `quantity > 0` [name: 'chk_reservation_quantity']
+    `status IN ('RESERVED', 'RELEASED', 'SHIPPED')` [name: 'chk_reservation_status']
+  }
+  Note: 'Giữ chỗ thuộc phiếu; không tự hết hạn. RELEASED/SHIPPED vẫn lưu để audit và chống lặp. Không sử dụng reservation của phiếu khác.'
+}
+
+Table inventory_db.inventory_adjustments {
+  id uuid [pk, not null]
+  warehouse_id uuid [not null]
+  product_id uuid [not null]
+  type varchar(16) [not null]
+  delta integer [not null]
+  reason text [not null]
+  actor_id uuid [not null, note: 'LOGICAL: auth_db.users.id.']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  checks {
+    `(type = 'INITIAL' AND delta >= 0) OR (type = 'ADJUSTMENT' AND delta <> 0)` [name: 'chk_adjustment_type_delta']
+    `length(btrim(reason)) > 0` [name: 'chk_adjustment_reason']
+  }
+  Note: 'INITIAL chỉ khi chưa có balance; ADJUSTMENT yêu cầu balance đã tồn tại. Balance và chứng từ cùng transaction, không sửa reserved trực tiếp.'
+}
+
+Table inventory_db.stock_movements {
+  id uuid [pk, not null]
+  warehouse_id uuid [not null]
+  product_id uuid [not null]
+  movement_type varchar(16) [not null]
+  quantity_delta integer [not null]
+  reserved_delta integer [not null]
+  quantity_before integer [not null]
+  quantity_after integer [not null]
+  reserved_before integer [not null]
+  reserved_after integer [not null]
+  transfer_id uuid [note: 'LOGICAL: transfer_db.transfers.id; NULL cho INITIAL/ADJUSTMENT.']
+  adjustment_id uuid [note: 'FK nội bộ; NULL cho nghiệp vụ transfer.']
+  operation_id uuid [not null, note: 'Transfer operation hoặc ID thao tác nhập/điều chỉnh của Inventory.']
+  actor_id uuid [not null, note: 'LOGICAL: auth_db.users.id; actor đã được xác thực.']
+  reason text
+  created_at timestamptz [not null, default: `clock_timestamp()`]
+  indexes {
+    (operation_id, warehouse_id, product_id, movement_type) [unique]
+    (warehouse_id, product_id, created_at, id)
+    (transfer_id, movement_type)
+  }
+  checks {
+    `movement_type IN ('INITIAL', 'ADJUSTMENT', 'RESERVE', 'RELEASE', 'SHIP', 'RECEIVE')` [name: 'chk_movement_type']
+    `quantity_before >= 0 AND quantity_after >= 0 AND reserved_before >= 0 AND reserved_after >= 0 AND reserved_before <= quantity_before AND reserved_after <= quantity_after` [name: 'chk_movement_balances']
+  }
+  Note: 'Append-only, cùng transaction với balance. Số đang vận chuyển dựa trên SHIP/RECEIVE đã commit. Cần bổ sung ràng buộc/vòng đời chặn ship/receive lại cùng phiếu khi operation_id khác; unique theo operation chưa đủ. Kiểm tra delta, tham chiếu adjustment/transfer và snapshot ở bước chi tiết.'
+}
+
+Table inventory_db.inventory_operation_results {
+  operation_id uuid [pk, not null, note: 'LOGICAL: transfer_db.transfer_operations.id.']
+  transfer_id uuid [not null]
+  operation_type varchar(32) [not null, note: 'ReserveStock / ReleaseStock / ShipStock / ReceiveStock.']
+  payload_hash varchar(64) [not null]
+  outcome varchar(24) [not null, note: 'Đề xuất: SUCCEEDED/FAILED; chỉ kết quả cuối cùng đã xác định chắc chắn.']
+  result_payload jsonb [not null]
+  processed_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  Note: 'Retry cùng operation trả kết quả cũ; payload khác bị từ chối. Receive chưa cộng hàng xong phải phục hồi cùng operation, không lưu FAILED cuối cùng chặn xử lý lại.'
+}
+
+Table inventory_db.outbox_messages {
+  ~outbox_fields
+  Note: 'Bảng riêng Inventory; lưu result/event cùng transaction với stock. Publisher confirm và consumer chống trùng vẫn bắt buộc.'
+}
+
+Table inventory_db.processed_messages {
+  ~processed_message_fields
+  Note: 'Bảng riêng Inventory; chỉ ghi hoàn tất khi command được xử lý bền vững. ACK sau commit; chưa đủ điều kiện xử lý thì không đánh dấu hoàn tất.'
+}
+
+Table inventory_db.idempotency_records {
+  ~idempotency_fields
+  Note: 'Cho API khởi tạo/điều chỉnh tồn. Cùng key khác payload trả 409. Không tự xóa key trong MVP.'
+}
+
+Table inventory_db.resource_usage_tasks {
+  ~resource_usage_task_fields
+  Note: 'ĐỀ XUẤT ý định bền vững trước gọi Product/Warehouse; không dùng timeout làm bằng chứng hết sử dụng. Cần chốt state machine và phục hồi cạnh tranh.'
+}
+
+// TRANSFER.
+Table transfer_db.transfers {
+  id uuid [pk, not null]
+  transfer_code varchar(64) [not null, unique]
+  source_warehouse_id uuid [not null]
+  destination_warehouse_id uuid [not null]
+  status varchar(16) [not null, default: 'DRAFT']
+  version integer [not null, default: 1]
+  current_operation_id uuid [note: 'FK ghép bảo đảm operation thuộc chính phiếu này.']
+  created_by uuid [not null, note: 'LOGICAL: auth_db.users.id.']
+  approved_by uuid
+  shipped_by uuid
+  received_by uuid
+  cancelled_by uuid
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  approved_at timestamptz
+  shipped_at timestamptz
+  received_at timestamptz
+  completed_at timestamptz
+  cancelled_at timestamptz
+  cancel_reason text
+  note text
+  checks {
+    `source_warehouse_id <> destination_warehouse_id` [name: 'chk_transfer_warehouses']
+    `status IN ('DRAFT', 'PENDING', 'APPROVED', 'SHIPPED', 'RECEIVED', 'COMPLETED', 'CANCELLED')` [name: 'chk_transfer_status']
+    `version > 0` [name: 'chk_transfer_version']
+    `status <> 'CANCELLED' OR (cancel_reason IS NOT NULL AND length(btrim(cancel_reason)) > 0)` [name: 'chk_transfer_cancel_reason']
+  }
+  Note: 'Chỉ sửa nội dung DRAFT, phiếu phải có ít nhất một item. Approve/ship/cancel APPROVED đợi result mới đổi trạng thái; receive ghi RECEIVED trước cộng hàng, chỉ COMPLETED sau result thành công. Không xóa phiếu.'
+}
+
+Table transfer_db.transfer_items {
+  id uuid [pk, not null]
+  transfer_id uuid [not null]
+  product_id uuid [not null, note: 'LOGICAL: product_db.products.id.']
+  quantity integer [not null]
+  indexes {
+    (transfer_id, product_id) [unique]
+  }
+  checks {
+    `quantity > 0` [name: 'chk_transfer_item_quantity']
+  }
+  Note: 'MVP xuất đủ/nhận đủ toàn phiếu; không chia chuyến. Snapshot tên danh mục chưa chốt nên chưa thêm cột.'
+}
+
+Table transfer_db.transfer_operations {
+  id uuid [pk, not null]
+  transfer_id uuid [not null]
+  type varchar(24) [not null, note: 'APPROVE/CANCEL/SHIP/RECEIVE; CANCEL chỉ cho APPROVED.']
+  status varchar(24) [not null, default: 'PROCESSING']
+  request_payload jsonb [not null, note: 'Kho, dòng hàng và ý nghĩa nghiệp vụ bất biến khi retry.']
+  actor_id uuid [not null, note: 'LOGICAL: auth_db.users.id.']
+  expected_transfer_version integer [not null]
+  error_code varchar(100)
+  error_details jsonb
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  completed_at timestamptz
+  indexes {
+    (transfer_id, id) [unique, note: 'Khóa đích cho các FK ghép bảo đảm cùng phiếu.']
+    (transfer_id, status)
+  }
+  checks {
+    `type IN ('APPROVE', 'CANCEL', 'SHIP', 'RECEIVE')` [name: 'chk_transfer_operation_type']
+    `status IN ('PROCESSING', 'SUCCEEDED', 'FAILED', 'RECOVERY_REQUIRED')` [name: 'chk_transfer_operation_status']
+  }
+  Note: 'MIGRATION CẦN: partial unique trên transfer_id WHERE status IN (PROCESSING, RECOVERY_REQUIRED), kèm khóa khi tiếp nhận. Không thay bằng unique(transfer_id,status) vì một phiếu có nhiều operation SUCCEEDED/FAILED hợp lệ. Receive lỗi phục hồi cùng ID.'
+}
+
+Table transfer_db.transfer_history {
+  id uuid [pk, not null]
+  transfer_id uuid [not null]
+  action varchar(32) [not null, note: 'ĐỀ XUẤT để lưu cả sửa nháp/yêu cầu phục hồi không đổi status.']
+  old_status varchar(16) [note: 'NULL khi tạo phiếu.']
+  new_status varchar(16) [not null]
+  actor_type varchar(16) [not null, note: 'ĐỀ XUẤT USER/SYSTEM, tương tự audit Auth.']
+  changed_by uuid [note: 'LOGICAL: auth_db.users.id; SYSTEM thì NULL.']
+  operation_id uuid [note: 'FK ghép; nếu có phải thuộc cùng phiếu.']
+  note text
+  changed_at timestamptz [not null, default: `clock_timestamp()`]
+  indexes {
+    (transfer_id, changed_at, id)
+  }
+  checks {
+    `(actor_type = 'USER' AND changed_by IS NOT NULL) OR (actor_type = 'SYSTEM' AND changed_by IS NULL)` [name: 'chk_transfer_history_actor']
+  }
+  Note: 'Append-only. COMPLETED do SYSTEM; operation truy ngược người nhận hàng. Yêu cầu phục hồi Admin phải được audit dù old_status = new_status.'
+}
+
+Table transfer_db.outbox_messages {
+  ~outbox_fields
+  Note: 'Bảng riêng Transfer; command cùng transaction tiếp nhận operation, domain event cùng transaction áp dụng result.'
+}
+
+Table transfer_db.processed_messages {
+  ~processed_message_fields
+  Note: 'Bảng riêng Transfer; chống trùng result trong transaction cập nhật phiếu/operation/history. Result cũ không làm lùi trạng thái.'
+}
+
+Table transfer_db.idempotency_records {
+  ~idempotency_fields
+  Note: 'Tạo phiếu, submit, approve, cancel, ship, receive phải có key. Nhận key và nghiệp vụ nguyên tử; retry trả resource/operation cũ và kết quả hiện hành.'
+}
+
+Table transfer_db.resource_usage_tasks {
+  ~resource_usage_task_fields
+  Note: 'ĐỀ XUẤT đăng ký kho nguồn/đích và sản phẩm từ DRAFT; sửa nháp đăng ký mới trước, giải phóng cũ sau. Chỉ giải phóng khi kết thúc và không còn operation chưa giải quyết.'
+}
+
+// 5 nhóm màu, tương ứng 5 database RIÊNG.
+TableGroup Auth_Service [color: #2563EB] {
+  auth_db.users
+  auth_db.user_permissions
+  auth_db.user_audit_logs
+}
+
+TableGroup Product_Service [color: #16A34A] {
+  product_db.products
+  product_db.product_audit_logs
+  product_db.product_usage_references
+}
+
+TableGroup Warehouse_Service [color: #D97706] {
+  warehouse_db.warehouses
+  warehouse_db.warehouse_audit_logs
+  warehouse_db.warehouse_usage_references
+}
+
+TableGroup Inventory_Service [color: #7C3AED] {
+  inventory_db.inventory_balances
+  inventory_db.stock_reservations
+  inventory_db.inventory_adjustments
+  inventory_db.stock_movements
+  inventory_db.inventory_operation_results
+  inventory_db.outbox_messages
+  inventory_db.processed_messages
+  inventory_db.idempotency_records
+  inventory_db.resource_usage_tasks
+}
+
+TableGroup Transfer_Service [color: #DC2626] {
+  transfer_db.transfers
+  transfer_db.transfer_items
+  transfer_db.transfer_operations
+  transfer_db.transfer_history
+  transfer_db.outbox_messages
+  transfer_db.processed_messages
+  transfer_db.idempotency_records
+  transfer_db.resource_usage_tasks
+}
+
+// FK NỘI BỘ — chỉ trong cùng một database. Nét liền.
+Ref FK_auth_permission_user: auth_db.user_permissions.user_id > auth_db.users.id [delete: restrict]
+Ref FK_auth_permission_granter: auth_db.user_permissions.granted_by > auth_db.users.id [delete: restrict]
+Ref FK_auth_audit_user: auth_db.user_audit_logs.user_id > auth_db.users.id [delete: restrict]
+Ref FK_auth_audit_actor: auth_db.user_audit_logs.actor_id ?>? auth_db.users.id [delete: restrict]
+Ref FK_product_audit: product_db.product_audit_logs.product_id > product_db.products.id [delete: restrict]
+Ref FK_product_usage: product_db.product_usage_references.product_id > product_db.products.id [delete: restrict]
+Ref FK_warehouse_audit: warehouse_db.warehouse_audit_logs.warehouse_id > warehouse_db.warehouses.id [delete: restrict]
+Ref FK_warehouse_usage: warehouse_db.warehouse_usage_references.warehouse_id > warehouse_db.warehouses.id [delete: restrict]
+Ref FK_reservation_balance: inventory_db.stock_reservations.(source_warehouse_id, product_id) > inventory_db.inventory_balances.(warehouse_id, product_id) [delete: restrict]
+Ref FK_adjustment_balance: inventory_db.inventory_adjustments.(warehouse_id, product_id) > inventory_db.inventory_balances.(warehouse_id, product_id) [delete: restrict]
+Ref FK_movement_balance: inventory_db.stock_movements.(warehouse_id, product_id) > inventory_db.inventory_balances.(warehouse_id, product_id) [delete: restrict]
+Ref FK_movement_adjustment: inventory_db.stock_movements.adjustment_id ?>? inventory_db.inventory_adjustments.id [delete: restrict]
+Ref FK_transfer_item: transfer_db.transfer_items.transfer_id > transfer_db.transfers.id [delete: restrict]
+Ref FK_transfer_operation: transfer_db.transfer_operations.transfer_id > transfer_db.transfers.id [delete: restrict]
+Ref FK_transfer_history: transfer_db.transfer_history.transfer_id > transfer_db.transfers.id [delete: restrict]
+// id của transfers là PK: mỗi operation chỉ có thể là current của tối đa một phiếu.
+// Cả hai phía tùy chọn: phiếu có thể chưa có operation; operation cũ có thể không còn current.
+Ref FK_transfer_current_operation: transfer_db.transfer_operations.(transfer_id, id) ?-? transfer_db.transfers.(id, current_operation_id) [delete: restrict]
+Ref FK_transfer_history_operation: transfer_db.transfer_history.(transfer_id, operation_id) ?>? transfer_db.transfer_operations.(transfer_id, id) [delete: restrict]
+
+// LOGICAL ONLY — nét đứt màu cam; chỉ để xem quan hệ giữa service.
+// Tuyệt đối không chuyển các Ref LOGICAL_* thành FK trong PostgreSQL.
+// Các tham chiếu đa hình (usage task, outbox, idempotency) được ghi bằng Note tại cột.
+Ref LOGICAL_user_warehouse: auth_db.users.assigned_warehouse_id ?>? warehouse_db.warehouses.id [inactive, color: #F59E0B]
+Ref LOGICAL_balance_warehouse: inventory_db.inventory_balances.warehouse_id > warehouse_db.warehouses.id [inactive, color: #F59E0B]
+Ref LOGICAL_balance_product: inventory_db.inventory_balances.product_id > product_db.products.id [inactive, color: #F59E0B]
+Ref LOGICAL_reservation_transfer: inventory_db.stock_reservations.transfer_id > transfer_db.transfers.id [inactive, color: #F59E0B]
+Ref LOGICAL_reservation_reserve_operation: inventory_db.stock_reservations.reserve_operation_id > transfer_db.transfer_operations.id [inactive, color: #F59E0B]
+Ref LOGICAL_reservation_last_operation: inventory_db.stock_reservations.last_operation_id > transfer_db.transfer_operations.id [inactive, color: #F59E0B]
+Ref LOGICAL_movement_transfer: inventory_db.stock_movements.transfer_id ?>? transfer_db.transfers.id [inactive, color: #F59E0B]
+Ref LOGICAL_result_transfer: inventory_db.inventory_operation_results.transfer_id > transfer_db.transfers.id [inactive, color: #F59E0B]
+// Một operation có thể chưa có result; mỗi result thuộc đúng một operation.
+Ref LOGICAL_result_operation: transfer_db.transfer_operations.id -? inventory_db.inventory_operation_results.operation_id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_source: transfer_db.transfers.source_warehouse_id > warehouse_db.warehouses.id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_destination: transfer_db.transfers.destination_warehouse_id > warehouse_db.warehouses.id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_item_product: transfer_db.transfer_items.product_id > product_db.products.id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_creator: transfer_db.transfers.created_by > auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_approver: transfer_db.transfers.approved_by ?>? auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_shipper: transfer_db.transfers.shipped_by ?>? auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_receiver: transfer_db.transfers.received_by ?>? auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_transfer_canceller: transfer_db.transfers.cancelled_by ?>? auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_operation_actor: transfer_db.transfer_operations.actor_id > auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_history_actor: transfer_db.transfer_history.changed_by ?>? auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_adjustment_actor: inventory_db.inventory_adjustments.actor_id > auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_movement_actor: inventory_db.stock_movements.actor_id > auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_product_audit_actor: product_db.product_audit_logs.actor_id > auth_db.users.id [inactive, color: #F59E0B]
+Ref LOGICAL_warehouse_audit_actor: warehouse_db.warehouse_audit_logs.actor_id > auth_db.users.id [inactive, color: #F59E0B]
+
+Note Huong_dan_doc_so_do {
+  '''
+  Mỗi nhóm màu = một service/database riêng.
+  Nét liền FK_* = khóa ngoại nội bộ.
+  Nét đứt cam LOGICAL_* = tham chiếu ID, kiểm tra bằng API/message.
+  Các bảng kỹ thuật ở Inventory và Transfer là các bảng riêng, dù cùng tên.
+  Sơ đồ có đủ 26 bảng từ database-overview.md; xem Note của bảng/cột để đọc giới hạn.
+  '''
+}
+
+Note Nhung_diem_chua_chot {
+  '''
+  Chưa phải migration: cột ngoài Auth là đề xuất để trực quan hóa.
+  Cần chốt kiểu/giới hạn số lượng, chống ship/receive lặp khác operation ID,
+  giao thức usage reference, quy tắc disable kho còn nhân viên,
+  snapshot tên danh mục và audit phục hồi.
+  Trigger audit, partial unique operation đang chờ và transaction/khóa
+  không được thay thế chỉ bằng các đường nối trên sơ đồ.
+  '''
+}

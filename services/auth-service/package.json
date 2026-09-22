@@ -7,6 +7,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "migration:show": "pnpm build && node node_modules/typeorm/cli.js migration:show -d dist/database/data-source.js",
+    "migration:run": "pnpm build && node node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js",
+    "migration:revert": "pnpm build && node node_modules/typeorm/cli.js migration:revert -d dist/database/data-source.js",
+    "test:database": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-database.json --runInBand",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
