@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnvironment } from './config/environment';
 import { authDatabaseOptions } from './database/database-options';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { authDatabaseOptions } from './database/database-options';
         retryDelay: 1000,
       }),
     }),
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

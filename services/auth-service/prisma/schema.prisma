@@ -1,0 +1,71 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Mirrors the existing database. CHECK constraints and the audit trigger remain
+// in PostgreSQL; their SQL must be included in the baseline in the next step.
+model User {
+  id                  String           @id(map: "pk_users") @db.Uuid
+  username            String           @unique(map: "uq_users_username") @db.VarChar(50)
+  email               String           @unique(map: "uq_users_email") @db.VarChar(254)
+  passwordHash        String           @map("password_hash") @db.Text
+  role                String           @db.VarChar(32)
+  assignedWarehouseId String?          @map("assigned_warehouse_id") @db.Uuid
+  status              String           @default("ACTIVE") @db.VarChar(16)
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime         @default(now()) @map("updated_at") @db.Timestamptz(6)
+  permissions         UserPermission[] @relation("PermissionRecipient")
+  grantedPermissions  UserPermission[] @relation("PermissionGranter")
+  auditLogs           UserAuditLog[]    @relation("AuditSubject")
+  performedAuditLogs  UserAuditLog[]    @relation("AuditActor")
+
+  // UUID and updatedAt are set explicitly by business logic, as before.
+  // No cross-service foreign key for assignedWarehouseId.
+  @@index([assignedWarehouseId], map: "idx_users_warehouse")
+  @@map("users")
+}
+
+model UserPermission {
+  userId     String   @map("user_id") @db.Uuid
+  permission String   @db.VarChar(32)
+  grantedBy  String   @map("granted_by") @db.Uuid
+  grantedAt  DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+  user       User     @relation("PermissionRecipient", fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_user_permissions_user")
+  granter    User     @relation("PermissionGranter", fields: [grantedBy], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_user_permissions_granter")
+
+  @@id([userId, permission], map: "pk_user_permissions")
+  @@map("user_permissions")
+}
+
+model UserAuditLog {
+  id            String   @id(map: "pk_user_audit_logs") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  actorType     String   @map("actor_type") @db.VarChar(16)
+  actorId       String?  @map("actor_id") @db.Uuid
+  action        String   @db.VarChar(32)
+  beforeData    Json?    @map("before_data") @db.JsonB
+  afterData     Json     @map("after_data") @db.JsonB
+  correlationId String   @map("correlation_id") @db.VarChar(128)
+  createdAt     DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(6)
+  user          User     @relation("AuditSubject", fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_user_audit_user")
+  actor         User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_user_audit_actor")
+
+  @@index([createdAt(sort: Desc), id(sort: Desc)], map: "idx_user_audit_created")
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)], map: "idx_user_audit_user_created")
+  @@map("user_audit_logs")
+}
+
+// Preserve the existing TypeORM migration ledger during the transition.
+model LegacyAuthMigration {
+  id        Int    @id(map: "PK_82f05f50f845bb141e322ebed60") @default(autoincrement())
+  timestamp BigInt
+  name      String @db.VarChar
+
+  @@map("auth_migrations")
+}

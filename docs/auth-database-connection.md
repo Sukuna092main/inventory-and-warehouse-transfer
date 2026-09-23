@@ -1,7 +1,7 @@
 # Kết nối Auth Service với PostgreSQL local
 
 **Ngày:** 2026-09-22  
-**Phạm vi:** kết nối database và kiểm tra cấu hình. Entity/migration đã bổ sung ở bước sau; xem [hướng dẫn tạo bảng](./auth-database-migration.md). Chưa triển khai API đăng nhập.
+**Phạm vi:** kết nối database và kiểm tra cấu hình. Entity/migration đã bổ sung ở bước sau; xem [hướng dẫn tạo bảng](./auth-database-migration.md). Khi chạy HTTP server hiện tại cần thêm JWT_SECRET theo [hướng dẫn đăng nhập](./auth-login.md).
 
 ## Cấu hình
 

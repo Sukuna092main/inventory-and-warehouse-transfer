@@ -1,6 +1,6 @@
 # Seed Admin để chuẩn bị test API
 
-**Trạng thái:** Hoàn thành. Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Chưa triển khai API đăng nhập.
+**Trạng thái:** Hoàn thành. Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. API đăng nhập đã được bổ sung; xem [hướng dẫn test](./auth-login.md).
 
 ## Vai trò các file
 
@@ -30,7 +30,7 @@ SEED_ADMIN_EMAIL=admin@example.test
 SEED_ADMIN_PASSWORD=
 ```
 
-Mật khẩu seed cần 15–128 ký tự Unicode, không chỉ có khoảng trắng; có thể dùng một cụm từ dài dễ nhớ. Nếu có dấu `#` hoặc khoảng trắng đầu/cuối, đặt toàn bộ giá trị trong dấu nháy. Seed giữ nguyên mật khẩu, chỉ trim và chuyển chữ thường cho username/email.
+Mật khẩu seed hiện cần 8–128 ký tự Unicode theo cấu hình người dùng đã điều chỉnh, không chỉ có khoảng trắng; có thể dùng một cụm từ dài dễ nhớ. Nếu có dấu `#` hoặc khoảng trắng đầu/cuối, đặt toàn bộ giá trị trong dấu nháy. Seed giữ nguyên mật khẩu, chỉ trim và chuyển chữ thường cho username/email.
 
 Đây là mật khẩu **tài khoản ứng dụng**, khác `DB_PASSWORD` của tài khoản PostgreSQL. Bạn có thể xem lại giá trị đã đặt trong `.env` khi test API. `.env` đã được Git bỏ qua; `.env.example` chỉ ghi tên biến và để trống mật khẩu. Không cần gửi mật khẩu vào hội thoại hoặc thêm nó vào mã nguồn.
 

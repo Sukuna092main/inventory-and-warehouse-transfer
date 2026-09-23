@@ -28,7 +28,7 @@ describe('Seed Admin configuration', () => {
     ['SEED_ADMIN_EMAIL', '.admin@example.test'],
     ['SEED_ADMIN_EMAIL', 'admin@-example.test'],
     ['SEED_ADMIN_EMAIL', 'a'.repeat(65) + '@example.test'],
-    ['SEED_ADMIN_PASSWORD', 'short-secret'],
+    ['SEED_ADMIN_PASSWORD', 'short'],
     ['SEED_ADMIN_PASSWORD', 'x'.repeat(129)],
   ])('rejects invalid %s without including its value', (key, value) => {
     let message = '';

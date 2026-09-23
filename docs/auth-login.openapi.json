@@ -1,0 +1,48 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Auth login development API", "version": "0.1.0", "description": "Endpoint đăng nhập hiện đã triển khai; các endpoint Auth khác sẽ bổ sung sau." },
+  "servers": [{ "url": "http://localhost:3000", "description": "Auth local trước khi có Gateway" }],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Đăng nhập bằng username hoặc email",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": {
+            "type": "object", "additionalProperties": false, "required": ["identifier", "password"],
+            "properties": {
+              "identifier": { "type": "string", "minLength": 1, "maxLength": 254, "description": "Username/email, trim và chuyển chữ thường" },
+              "password": { "type": "string", "format": "password", "minLength": 1, "maxLength": 128, "writeOnly": true }
+            }
+          } } }
+        },
+        "responses": {
+          "200": { "description": "Đăng nhập thành công; Cache-Control: no-store", "content": { "application/json": { "schema": {
+            "type": "object", "required": ["accessToken", "tokenType", "expiresIn"],
+            "properties": {
+              "accessToken": { "type": "string", "description": "JWT ký HS256, sub=user ID, issuer=inventory-auth, audience=inventory-api" },
+              "tokenType": { "type": "string", "enum": ["Bearer"] },
+              "expiresIn": { "type": "integer", "enum": [1800], "description": "Thời hạn tính bằng giây" }
+            }
+          } } } },
+          "400": { "$ref": "#/components/responses/ApiError" },
+          "401": { "$ref": "#/components/responses/ApiError" },
+          "429": { "$ref": "#/components/responses/ApiError" },
+          "500": { "$ref": "#/components/responses/ApiError" },
+          "503": { "$ref": "#/components/responses/ApiError" }
+        }
+      }
+    }
+  },
+  "components": { "responses": { "ApiError": {
+    "description": "Lỗi có code, message và correlationId; 429 có Retry-After: 1",
+    "content": { "application/json": { "schema": {
+      "type": "object", "required": ["code", "message", "correlationId"],
+      "properties": {
+        "code": { "type": "string" }, "message": { "type": "string" }, "correlationId": { "type": "string" },
+        "details": { "type": "array", "items": { "type": "string" } }
+      }
+    } } }
+  } } }
+}

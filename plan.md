@@ -4,7 +4,7 @@
 **Phiên bản kế hoạch:** 1.0  
 **Ngày cập nhật:** 2026-09-23  
 **Tài liệu nghiệp vụ hiện hành:** [SRS phiên bản 1.1](./SRS_Inventory_Warehouse_Transfer_System_VI.md)  
-**Trạng thái dự án:** Auth đã kết nối PostgreSQL và tạo ba bảng nghiệp vụ bằng migration; chưa có nghiệp vụ đăng nhập  
+**Trạng thái dự án:** Auth đã có database, Admin seed và API đăng nhập được kiểm thử; chờ cấu hình JWT local và test thủ công, chưa có giao diện đăng nhập  
 **Thời gian mục tiêu:** 8 tuần, điều chỉnh theo tiến độ thực tế
 
 > Đây là tài liệu để cùng học, thống nhất và theo dõi công việc. Các công việc trong kế hoạch không đồng nghĩa với việc sẽ được tự động triển khai toàn bộ ngay lập tức.
@@ -91,7 +91,7 @@ Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web v�
 | Backend | NestJS với Express | Tổ chức controller, service, validation và phân quyền |
 | API Gateway | NestJS + HTTP proxy | Định tuyến, xác thực sơ bộ, CORS, correlation ID |
 | Database | PostgreSQL | Lưu nghiệp vụ, ràng buộc và transaction |
-| ORM | TypeORM | Kết nối database, migration và transaction riêng từng service |
+| ORM | Prisma ORM 7 | Lựa chọn mới; chuyển Auth từ TypeORM, quản lý schema/client/migration riêng từng service |
 | Messaging | RabbitMQ + amqplib trong module NestJS | Command/result, publisher confirm, manual ACK |
 | Web | React + Vite + React Router | Ứng dụng quản trị dạng SPA |
 | UI web | Material UI, thành phần miễn phí | Bảng, biểu mẫu, bộ lọc và hộp thoại |
@@ -110,7 +110,7 @@ Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web v�
 ### 3.1. Lý do chọn hướng này
 
 - Phù hợp kiến thức React/JavaScript hiện có; không thêm Java hoặc Dart vào giai đoạn MVP.
-- NestJS tổ chức backend theo module và có tích hợp TypeORM. Transaction của TypeORM phục vụ triển khai cập nhật tồn kho nguyên tử. Xem [NestJS Database](https://docs.nestjs.com/techniques/database) và [TypeORM Transactions](https://typeorm.io/docs/transactions/).
+- NestJS tổ chức backend theo module. Theo lựa chọn ngày 2026-09-23, dùng Prisma ORM 7 để truy vấn và quản lý migration; các thao tác cần transaction/khóa PostgreSQL vẫn phải thiết kế theo nghiệp vụ. Auth hiện dùng TypeORM và đang chuẩn bị chuyển theo [kế hoạch đổi ORM](./docs/prisma-transition.md). Xem [trạng thái phát hành Prisma](https://www.prisma.io/docs/orm/release-status).
 - Web và Android có thể dùng chung kiểu dữ liệu, API client và quy tắc validation phía giao diện. Bố cục và component hiển thị được phát triển riêng theo nền tảng.
 - Expo hỗ trợ pnpm monorepo và build Android tại máy. APK bàn giao phải chạy độc lập; Expo Go chỉ là lựa chọn thử nghiệm ban đầu. Xem [Expo Monorepos](https://docs.expo.dev/guides/monorepos/) và [Build Local](https://docs.expo.dev/guides/local-app-overview/).
 - Material UI và React Native Paper cung cấp component để tập trung vào chức năng nghiệp vụ. Chỉ dùng thành phần miễn phí và bản stable. Xem [Material UI](https://mui.com/material-ui/getting-started/) và [React Native Paper](https://oss.callstack.com/react-native-paper/).
@@ -246,12 +246,13 @@ Tất cả nhóm chức năng dưới đây đều có trên cả web và Androi
 | PREP-11 | Tạo thư mục giữ chỗ cho các thành phần còn lại | DONE | Ngày 2026-09-22: bốn service, Gateway, web và mobile có README mô tả trách nhiệm và trạng thái Chưa triển khai; chưa khởi tạo ứng dụng hoặc cấu hình workspace |
 | PREP-12 | Entity và migration đầu tiên cho Auth | DONE | Người dùng đã chạy migration; kiểm tra chỉ đọc ngày 2026-09-22 xác nhận ba bảng nghiệp vụ, auth_migrations, bản ghi CreateAuthTables1790035200000 và trigger bảo vệ audit đang bật. Trước đó 39 ca kiểm tra PostgreSQL, build, lint, unit/e2e đạt; xem docs/auth-database-migration.md |
 | PREP-13 | Seed Admin đầu tiên từ cấu hình local | DONE | Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Unit test và 8 ca seed trên PostgreSQL đã đạt, bao gồm chạy đồng thời; xem docs/seed-admin.md |
+| PREP-14 | Chuyển Auth từ TypeORM sang Prisma | IN_PROGRESS | Kết nối và truy vấn đăng nhập đã chuyển sang Prisma. Hợp đồng HTTP giữ nguyên; 26 unit test, 69 ca database, 1 e2e, build và lint đạt. Seed, baseline migration và test setup còn dùng TypeORM; chưa gỡ dependency. Xem docs/prisma-connection.md và docs/prisma-transition.md |
 
 ### 5.2. Theo dõi triển khai theo chức năng
 
 | Mã | Nhóm chức năng | Tham chiếu SRS | Backend | Web | Android | Kiểm thử |
 |---|---|---|---|---|---|---|
-| FEAT-01 | Đăng nhập, thông tin tài khoản, đăng xuất, quyền hiện hành | FR-AUTH-01/02, NFR-01, AC-01/23 | TODO | TODO | TODO | TODO |
+| FEAT-01 | Đăng nhập, thông tin tài khoản, đăng xuất, quyền hiện hành | FR-AUTH-01/02, NFR-01, AC-01/23 | IN_PROGRESS | TODO | TODO | IN_PROGRESS |
 | FEAT-02 | Quản lý người dùng, role, kho và quyền bổ sung | FR-AUTH-03, mục 2.4 | TODO | TODO | TODO | TODO |
 | FEAT-03 | Danh mục sản phẩm, tìm kiếm, trạng thái | FR-PRODUCT-01–04, BR-16, AC-02/24 | TODO | TODO | TODO | TODO |
 | FEAT-04 | Danh mục kho, tìm kiếm, trạng thái | FR-WH-01–03, BR-16, AC-02/24 | TODO | TODO | TODO | TODO |
@@ -406,14 +407,15 @@ Khi đồng bộ, rà lại toàn bộ các chỗ đề cập “frontend” đ�
 | DEC-11 | 2026-09-19 | Giữ GPS ngoài phạm vi; tiếp tục theo dõi trạng thái phiếu, lịch sử xử lý và biến động tồn | Người dùng quyết định không bổ sung tracking GPS sau khi trao đổi phạm vi và chi phí |
 | DEC-12 | 2026-09-19 | Xem thiết kế database tổng thể 5 service trước, sau đó chi tiết và code từng phần | Người dùng đồng ý cách làm tổng quan trước; Inventory và Transfer được thiết kế nghiệp vụ cùng nhau, triển khai từng chức năng nhỏ |
 | DEC-13 | 2026-09-22 | Seed Admin đọc SEED_ADMIN_* từ .env; băm bằng scrypt có sẵn trong Node.js | Người dùng muốn file seed để tiện test API và nhớ thông tin local; không thêm dependency, không hardcode mật khẩu, không reset tài khoản đã có |
+| DEC-14 | 2026-09-23 | Chuyển ORM từ TypeORM sang Prisma, bắt đầu ở Auth | Người dùng chọn Prisma. Dùng dòng 7 được hỗ trợ; giữ database/Admin và chuyển từng bước, người dùng cài dependency thủ công |
 
 Khi có quyết định mới, thêm một dòng thay vì âm thầm đổi lựa chọn cũ. Nếu thay đổi yêu cầu nghiệp vụ, cập nhật cả SRS ở bước tương ứng.
 
 ## 11. Bước tiếp theo
 
-**Mốc vừa hoàn thành:** Người dùng đã chạy `seed:admin`. Kiểm tra chỉ đọc xác nhận có 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Mật khẩu do người dùng quản lý trong cấu hình local, không ghi vào tài liệu. FEAT-01 vẫn TODO vì API đăng nhập chưa triển khai.
+**Mốc vừa hoàn thành:** Đã triển khai `POST /api/auth/login`: username/email, kiểm tra mật khẩu và tài khoản ACTIVE, JWT HS256 có hạn 30 phút, validation và lỗi theo SRS. Đã đạt 26 unit test, 69 ca database (gồm 22 ca HTTP đăng nhập) và 1 e2e GET `/`. Khóa ký và tài khoản thử trong test độc lập với cấu hình/dữ liệu thật. FEAT-01 vẫn IN_PROGRESS vì còn thông tin tài khoản, guard/quyền hiện hành và hai giao diện.
 
-**Bước hiện tại: chuẩn bị dependency cho API đăng nhập `POST /api/auth/login`.** Auth chưa có `@nestjs/jwt`, `class-validator`, `class-transformer`; người dùng cài thủ công bằng `pnpm add --save-exact --strict-peer-dependencies @nestjs/jwt class-validator class-transformer` tại `services/auth-service`. Sau khi cài, kiểm tra phiên bản tương thích NestJS 12 rồi triển khai API, giải thích vai trò từng file và hướng dẫn test. Chưa viết endpoint hoặc đánh dấu FEAT-01 hoàn thành.
+**Mốc vừa hoàn thành: API đăng nhập đọc người dùng bằng Prisma.** Truy vấn chọn rõ ID, trạng thái và password hash để xác minh; client mặc định bỏ hash khỏi kết quả truy vấn khác. 22 ca HTTP đăng nhập chạy trên PostgreSQL thật đều đạt, cùng 26 unit test, 69 ca database, 1 e2e, build và lint. Bước tiếp theo của PREP-14 là chuyển seed Admin sang Prisma trong một transaction; baseline migration và dọn TypeORM được xử lý sau. Xem [tài liệu đăng nhập](./docs/auth-login.md) và [kế hoạch chuyển ORM](./docs/prisma-transition.md).
 
 - Đọc [database tổng quan](./docs/database-overview.md): service sở hữu từng nhóm bảng, quan hệ nội bộ/liên service, command/result và ví dụ chuyển kho.
 - Có thể dán [database.dbml](./docs/database.dbml) vào dbdiagram để xem 26 bảng trong 5 nhóm service. Nét đứt chỉ là tham chiếu logic liên service; các cột ngoài Auth còn là đề xuất, không xuất nguyên sơ đồ thành migration.
