@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Biểu tượng quản lý kho</title>
+  <rect width="64" height="64" rx="15" fill="#6B4428"/>
+  <path d="M12 23 32 12l20 11-20 11-20-11Z"
+        fill="#E8C794" stroke="#FFF7E8" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M12 23 32 34v20L12 43V23Z"
+        fill="#C99155" stroke="#FFF7E8" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M52 23 32 34v20l20-11V23Z"
+        fill="#DEAD70" stroke="#FFF7E8" stroke-width="2" stroke-linejoin="round"/>
+  <path d="m25 16 7-4 20 11-7 4-20-11Z" fill="#FFF3D7"/>
+  <path d="M32 34v20" stroke="#FFF7E8" stroke-width="2"/>
+</svg>

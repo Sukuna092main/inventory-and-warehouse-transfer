@@ -1,0 +1,13 @@
+:root {
+  font-family: Roboto, "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+#root {
+  min-height: 100vh;
+}

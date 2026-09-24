@@ -37,12 +37,12 @@
 
 ### Quy ước trạng thái
 
-| Trạng thái | Ý nghĩa |
-|---|---|
-| `TODO` | Chưa bắt đầu |
-| `IN_PROGRESS` | Đang thực hiện, chưa đáp ứng đầy đủ điều kiện hoàn thành |
-| `BLOCKED` | Không thể tiếp tục phần việc này; phải ghi nguyên nhân và điều kiện tháo gỡ |
-| `DONE` | Đã hoàn thành và có bằng chứng kiểm tra phù hợp |
+| Trạng thái    | Ý nghĩa                                                                     |
+| ------------- | --------------------------------------------------------------------------- |
+| `TODO`        | Chưa bắt đầu                                                                |
+| `IN_PROGRESS` | Đang thực hiện, chưa đáp ứng đầy đủ điều kiện hoàn thành                    |
+| `BLOCKED`     | Không thể tiếp tục phần việc này; phải ghi nguyên nhân và điều kiện tháo gỡ |
+| `DONE`        | Đã hoàn thành và có bằng chứng kiểm tra phù hợp                             |
 
 Một nhóm chức năng chỉ hoàn thành khi Backend, Web, Android và Kiểm thử đều `DONE`. Giao diện mock, API chưa tích hợp, code chưa chạy hoặc package mới cài không được tính là chức năng hoàn thành.
 
@@ -83,29 +83,29 @@ Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web v�
 
 ## 3. Tech stack đã chọn
 
-| Thành phần | Công nghệ | Vai trò trong dự án |
-|---|---|---|
-| Ngôn ngữ | TypeScript, strict mode | Thống nhất ngôn ngữ, kiểm tra kiểu dữ liệu |
-| Runtime | Node.js 24 LTS | Chạy backend và công cụ phát triển |
-| Workspace | pnpm workspaces | Quản lý nhiều ứng dụng/package trong một repository |
-| Backend | NestJS với Express | Tổ chức controller, service, validation và phân quyền |
-| API Gateway | NestJS + HTTP proxy | Định tuyến, xác thực sơ bộ, CORS, correlation ID |
-| Database | PostgreSQL | Lưu nghiệp vụ, ràng buộc và transaction |
-| ORM | Prisma ORM 7 | Lựa chọn mới; chuyển Auth từ TypeORM, quản lý schema/client/migration riêng từng service |
-| Messaging | RabbitMQ + amqplib trong module NestJS | Command/result, publisher confirm, manual ACK |
-| Web | React + Vite + React Router | Ứng dụng quản trị dạng SPA |
-| UI web | Material UI, thành phần miễn phí | Bảng, biểu mẫu, bộ lọc và hộp thoại |
-| Android | React Native + Expo + Expo Router | App Android riêng và điều hướng màn hình |
-| UI Android | React Native Paper bản stable | Thành phần giao diện phù hợp điện thoại |
-| Dữ liệu client | TanStack Query | Cache, tải lại dữ liệu, theo dõi operation |
-| Biểu mẫu | React Hook Form + Zod | Quản lý form và validation phía giao diện |
-| Token Android | Expo SecureStore | Lưu token trên thiết bị |
-| Tài liệu API | OpenAPI/Swagger | Hợp đồng API để tích hợp hai client |
-| Bộ request mẫu | Bruno | Chạy và lưu các kịch bản API |
-| Test backend | Jest + Supertest | Unit test và API/integration test |
-| Test web | Vitest + React Testing Library + Playwright | Component test và luồng sử dụng web |
-| Test Android | Jest + React Native Testing Library; kiểm tra APK thực tế | Component test và nghiệm thu trên thiết bị/emulator |
-| Đóng gói | Docker Compose; Android SDK và Gradle | Chạy hệ thống local và build APK |
+| Thành phần     | Công nghệ                                                 | Vai trò trong dự án                                                                      |
+| -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Ngôn ngữ       | TypeScript, strict mode                                   | Thống nhất ngôn ngữ, kiểm tra kiểu dữ liệu                                               |
+| Runtime        | Node.js 24 LTS                                            | Chạy backend và công cụ phát triển                                                       |
+| Workspace      | pnpm workspaces                                           | Quản lý nhiều ứng dụng/package trong một repository                                      |
+| Backend        | NestJS với Express                                        | Tổ chức controller, service, validation và phân quyền                                    |
+| API Gateway    | NestJS + HTTP proxy                                       | Định tuyến, xác thực sơ bộ, CORS, correlation ID                                         |
+| Database       | PostgreSQL                                                | Lưu nghiệp vụ, ràng buộc và transaction                                                  |
+| ORM            | Prisma ORM 7                                              | Lựa chọn mới; chuyển Auth từ TypeORM, quản lý schema/client/migration riêng từng service |
+| Messaging      | RabbitMQ + amqplib trong module NestJS                    | Command/result, publisher confirm, manual ACK                                            |
+| Web            | React + Vite + React Router                               | Ứng dụng quản trị dạng SPA                                                               |
+| UI web         | Material UI, thành phần miễn phí                          | Bảng, biểu mẫu, bộ lọc và hộp thoại                                                      |
+| Android        | React Native + Expo + Expo Router                         | App Android riêng và điều hướng màn hình                                                 |
+| UI Android     | React Native Paper bản stable                             | Thành phần giao diện phù hợp điện thoại                                                  |
+| Dữ liệu client | TanStack Query                                            | Cache, tải lại dữ liệu, theo dõi operation                                               |
+| Biểu mẫu       | React Hook Form + Zod                                     | Quản lý form và validation phía giao diện                                                |
+| Token Android  | Expo SecureStore                                          | Lưu token trên thiết bị                                                                  |
+| Tài liệu API   | OpenAPI/Swagger                                           | Hợp đồng API để tích hợp hai client                                                      |
+| Bộ request mẫu | Bruno                                                     | Chạy và lưu các kịch bản API                                                             |
+| Test backend   | Jest + Supertest                                          | Unit test và API/integration test                                                        |
+| Test web       | Vitest + React Testing Library + Playwright               | Component test và luồng sử dụng web                                                      |
+| Test Android   | Jest + React Native Testing Library; kiểm tra APK thực tế | Component test và nghiệm thu trên thiết bị/emulator                                      |
+| Đóng gói       | Docker Compose; Android SDK và Gradle                     | Chạy hệ thống local và build APK                                                         |
 
 ### 3.1. Lý do chọn hướng này
 
@@ -127,14 +127,14 @@ Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web v�
 
 ### 4.1. Phân chia trách nhiệm
 
-| Thành phần | Trách nhiệm chính | Dữ liệu sở hữu |
-|---|---|---|
-| Auth/User | Đăng nhập, tài khoản, vai trò, quyền và kho phụ trách | User, quyền bổ sung, audit tài khoản |
-| Product | SKU, sản phẩm, category/unit dạng thuộc tính, trạng thái | Product, audit, tham chiếu sử dụng sản phẩm |
-| Warehouse | Kho, mã kho, địa chỉ, trạng thái | Warehouse, audit, tham chiếu sử dụng kho |
-| Inventory | Số dư, giữ chỗ, điều chỉnh, biến động và hàng đang vận chuyển | Inventory, Reservation, Movement, Adjustment, kết quả operation |
-| Transfer | Phiếu, workflow, điều phối thao tác tồn kho, phục hồi | Transfer, Item, History, Operation |
-| API Gateway | Điểm vào chung của web/Android | Không sở hữu dữ liệu nghiệp vụ |
+| Thành phần  | Trách nhiệm chính                                             | Dữ liệu sở hữu                                                  |
+| ----------- | ------------------------------------------------------------- | --------------------------------------------------------------- |
+| Auth/User   | Đăng nhập, tài khoản, vai trò, quyền và kho phụ trách         | User, quyền bổ sung, audit tài khoản                            |
+| Product     | SKU, sản phẩm, category/unit dạng thuộc tính, trạng thái      | Product, audit, tham chiếu sử dụng sản phẩm                     |
+| Warehouse   | Kho, mã kho, địa chỉ, trạng thái                              | Warehouse, audit, tham chiếu sử dụng kho                        |
+| Inventory   | Số dư, giữ chỗ, điều chỉnh, biến động và hàng đang vận chuyển | Inventory, Reservation, Movement, Adjustment, kết quả operation |
+| Transfer    | Phiếu, workflow, điều phối thao tác tồn kho, phục hồi         | Transfer, Item, History, Operation                              |
+| API Gateway | Điểm vào chung của web/Android                                | Không sở hữu dữ liệu nghiệp vụ                                  |
 
 Transfer và Inventory trao đổi command/result qua RabbitMQ. REST phục vụ truy vấn và tiếp nhận yêu cầu người dùng; API nội bộ cần xác thực service. Không cho frontend gọi trực tiếp database, RabbitMQ hoặc API thay đổi stock nội bộ.
 
@@ -188,12 +188,12 @@ Package dùng chung chỉ chứa hợp đồng API/message, API client, validati
 
 ### 4.5. Thao tác bất đồng bộ và tính đúng đắn
 
-| Hành động | Xử lý tồn kho | Thời điểm đổi trạng thái phiếu |
-|---|---|---|
-| Approve | Reserve toàn bộ dòng hàng | PENDING → APPROVED sau result thành công |
-| Cancel APPROVED | Release đúng giữ chỗ của phiếu | APPROVED → CANCELLED sau result thành công |
-| Ship | Giảm quantity và reserved tại kho nguồn | APPROVED → SHIPPED sau result thành công |
-| Receive | Cộng quantity tại kho đích | SHIPPED → RECEIVED khi ghi xác nhận; RECEIVED → COMPLETED sau result thành công |
+| Hành động       | Xử lý tồn kho                           | Thời điểm đổi trạng thái phiếu                                                  |
+| --------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
+| Approve         | Reserve toàn bộ dòng hàng               | PENDING → APPROVED sau result thành công                                        |
+| Cancel APPROVED | Release đúng giữ chỗ của phiếu          | APPROVED → CANCELLED sau result thành công                                      |
+| Ship            | Giảm quantity và reserved tại kho nguồn | APPROVED → SHIPPED sau result thành công                                        |
+| Receive         | Cộng quantity tại kho đích              | SHIPPED → RECEIVED khi ghi xác nhận; RECEIVED → COMPLETED sau result thành công |
 
 - Giữ hợp đồng `202 + operationId` trong SRS. `202` chỉ xác nhận đã tiếp nhận bền vững, chưa xác nhận nghiệp vụ hoàn tất.
 - API client giữ nguyên Idempotency-Key cho cùng một thao tác khi thử lại sau lỗi mạng. Không tự tạo khóa mới để lặp một thao tác chưa rõ kết quả.
@@ -231,42 +231,42 @@ Tất cả nhóm chức năng dưới đây đều có trên cả web và Androi
 
 ### 5.1. Tiến độ chuẩn bị
 
-| Mã | Đầu ra | Trạng thái | Ghi chú |
-|---|---|---|---|
-| PREP-01 | Chốt nền tảng, phạm vi và hướng công nghệ | DONE | TypeScript, web + Android đầy đủ, local + APK |
-| PREP-02 | Hoàn thiện `plan.md` | DONE | Tài liệu hiện tại; không bao gồm triển khai code |
-| PREP-03 | Đồng bộ SRS lên 1.2 | TODO | Thực hiện ở bước riêng đã thống nhất |
-| PREP-04 | Giải thích và thống nhất kiến trúc chi tiết | TODO | Bắt đầu từ một ví dụ chuyển kho |
-| PREP-05 | Thiết kế dữ liệu và hợp đồng API/message | IN_PROGRESS | Có bản nháp tổng quan 5 service tại docs/database-overview.md (v0.1), sơ đồ docs/database.dbml và thiết kế Auth v0.4 đã có entity/migration được kiểm tra. Thiết kế chi tiết các service còn lại và hợp đồng API/message chưa hoàn tất |
-| PREP-06 | Danh sách màn hình và luồng điều hướng web/Android | TODO | Bao gồm màn hình quản trị và phục hồi |
-| PREP-07 | Kiểm tra môi trường, chốt phiên bản dependency | IN_PROGRESS | Node.js/pnpm và khung NestJS đã chạy; môi trường database, web, Android và bộ phiên bản toàn dự án còn cần kiểm tra |
-| PREP-08 | Khởi tạo và chạy Auth Service | DONE | Người dùng tạo bằng NestJS CLI, duyệt hai build script và cài dependency; GET http://localhost:3000 trả HTTP 200, nội dung Hello World! |
-| PREP-09 | PostgreSQL local, pgAdmin và database/tài khoản Auth | DONE | Người dùng xác nhận ngày 2026-09-18 đã hoàn tất các bước kiểm tra; kết nối 127.0.0.1:5433, database auth_db, tài khoản auth_user |
-| PREP-10 | Kết nối NestJS với auth_db | DONE | Kiểm tra ngày 2026-09-22 qua TypeORM DataSource của Nest: auth_db / auth_user, 0 bảng public; synchronize và migrationsRun đều false. Build, unit test và lint đạt; xem docs/auth-database-connection.md |
-| PREP-11 | Tạo thư mục giữ chỗ cho các thành phần còn lại | DONE | Ngày 2026-09-22: bốn service, Gateway, web và mobile có README mô tả trách nhiệm và trạng thái Chưa triển khai; chưa khởi tạo ứng dụng hoặc cấu hình workspace |
-| PREP-12 | Entity và migration đầu tiên cho Auth | DONE | Người dùng đã chạy migration; kiểm tra chỉ đọc ngày 2026-09-22 xác nhận ba bảng nghiệp vụ, auth_migrations, bản ghi CreateAuthTables1790035200000 và trigger bảo vệ audit đang bật. Trước đó 39 ca kiểm tra PostgreSQL, build, lint, unit/e2e đạt; xem docs/auth-database-migration.md |
-| PREP-13 | Seed Admin đầu tiên từ cấu hình local | DONE | Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Unit test và 8 ca seed trên PostgreSQL đã đạt, bao gồm chạy đồng thời; xem docs/seed-admin.md |
-| PREP-14 | Chuyển Auth từ TypeORM sang Prisma | DONE | Baseline `0_auth_baseline` đã applied trong `auth_db`; login, seed và test setup dùng Prisma/baseline SQL. Source, manifest và lockfile không còn TypeORM. Sau khi gỡ dependency: 26 unit, 68 database, 1 e2e, build và lint đạt. Xem docs/prisma-baseline.md và docs/prisma-transition.md |
-| PREP-15 | Gateway chuyển tiếp login và me của Auth | IN_PROGRESS | Đã chuẩn bị ứng dụng NestJS, JWT sơ bộ, CORS, correlation ID; kiểm tra kiểu và 5 ca HTTP đạt khi dùng package NestJS sẵn có của Auth. Chờ người dùng cài dependency/cấu hình local để chạy `pnpm build` và `pnpm test` trong Gateway. Xem apps/api-gateway/README.md |
+| Mã      | Đầu ra                                               | Trạng thái  | Ghi chú                                                                                                                                                                                                                                                                                                              |
+| ------- | ---------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PREP-01 | Chốt nền tảng, phạm vi và hướng công nghệ            | DONE        | TypeScript, web + Android đầy đủ, local + APK                                                                                                                                                                                                                                                                        |
+| PREP-02 | Hoàn thiện `plan.md`                                 | DONE        | Tài liệu hiện tại; không bao gồm triển khai code                                                                                                                                                                                                                                                                     |
+| PREP-03 | Đồng bộ SRS lên 1.2                                  | TODO        | Thực hiện ở bước riêng đã thống nhất                                                                                                                                                                                                                                                                                 |
+| PREP-04 | Giải thích và thống nhất kiến trúc chi tiết          | TODO        | Bắt đầu từ một ví dụ chuyển kho                                                                                                                                                                                                                                                                                      |
+| PREP-05 | Thiết kế dữ liệu và hợp đồng API/message             | IN_PROGRESS | Có bản nháp tổng quan 5 service tại docs/database-overview.md (v0.1), sơ đồ docs/database.dbml và thiết kế Auth v0.4 đã có entity/migration được kiểm tra. Thiết kế chi tiết các service còn lại và hợp đồng API/message chưa hoàn tất                                                                               |
+| PREP-06 | Danh sách màn hình và luồng điều hướng web/Android   | TODO        | Bao gồm màn hình quản trị và phục hồi                                                                                                                                                                                                                                                                                |
+| PREP-07 | Kiểm tra môi trường, chốt phiên bản dependency       | IN_PROGRESS | Node.js/pnpm và khung NestJS đã chạy; môi trường database, web, Android và bộ phiên bản toàn dự án còn cần kiểm tra                                                                                                                                                                                                  |
+| PREP-08 | Khởi tạo và chạy Auth Service                        | DONE        | Người dùng tạo bằng NestJS CLI, duyệt hai build script và cài dependency; GET http://localhost:3000 trả HTTP 200, nội dung Hello World!                                                                                                                                                                              |
+| PREP-09 | PostgreSQL local, pgAdmin và database/tài khoản Auth | DONE        | Người dùng xác nhận ngày 2026-09-18 đã hoàn tất các bước kiểm tra; kết nối 127.0.0.1:5433, database auth_db, tài khoản auth_user                                                                                                                                                                                     |
+| PREP-10 | Kết nối NestJS với auth_db                           | DONE        | Kiểm tra ngày 2026-09-22 qua TypeORM DataSource của Nest: auth_db / auth_user, 0 bảng public; synchronize và migrationsRun đều false. Build, unit test và lint đạt; xem docs/auth-database-connection.md                                                                                                             |
+| PREP-11 | Tạo thư mục giữ chỗ cho các thành phần còn lại       | DONE        | Ngày 2026-09-22: bốn service, Gateway, web và mobile có README mô tả trách nhiệm và trạng thái Chưa triển khai; chưa khởi tạo ứng dụng hoặc cấu hình workspace                                                                                                                                                       |
+| PREP-12 | Entity và migration đầu tiên cho Auth                | DONE        | Người dùng đã chạy migration; kiểm tra chỉ đọc ngày 2026-09-22 xác nhận ba bảng nghiệp vụ, auth_migrations, bản ghi CreateAuthTables1790035200000 và trigger bảo vệ audit đang bật. Trước đó 39 ca kiểm tra PostgreSQL, build, lint, unit/e2e đạt; xem docs/auth-database-migration.md                               |
+| PREP-13 | Seed Admin đầu tiên từ cấu hình local                | DONE        | Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Unit test và 8 ca seed trên PostgreSQL đã đạt, bao gồm chạy đồng thời; xem docs/seed-admin.md                                                                                                            |
+| PREP-14 | Chuyển Auth từ TypeORM sang Prisma                   | DONE        | Baseline `0_auth_baseline` đã applied trong `auth_db`; login, seed và test setup dùng Prisma/baseline SQL. Source, manifest và lockfile không còn TypeORM. Sau khi gỡ dependency: 26 unit, 68 database, 1 e2e, build và lint đạt. Xem docs/prisma-baseline.md và docs/prisma-transition.md                           |
+| PREP-15 | Gateway chuyển tiếp login và me của Auth             | DONE        | Đã chuẩn bị ứng dụng NestJS, JWT sơ bộ, CORS, correlation ID; kiểm tra kiểu và 5 ca HTTP đạt khi dùng package NestJS sẵn có của Auth. Chờ người dùng cài dependency/cấu hình local để chạy `pnpm build` và `pnpm test` trong Gateway. Xem apps/api-gateway/README.md; đã kiểm tra login/me với Auth thật qua Gateway |
 
 ### 5.2. Theo dõi triển khai theo chức năng
 
-| Mã | Nhóm chức năng | Tham chiếu SRS | Backend | Web | Android | Kiểm thử |
-|---|---|---|---|---|---|---|
-| FEAT-01 | Đăng nhập, thông tin tài khoản, đăng xuất, quyền hiện hành | FR-AUTH-01/02, NFR-01, AC-01/23 | IN_PROGRESS | TODO | TODO | IN_PROGRESS |
-| FEAT-02 | Quản lý người dùng, role, kho và quyền bổ sung | FR-AUTH-03, mục 2.4 | TODO | TODO | TODO | TODO |
-| FEAT-03 | Danh mục sản phẩm, tìm kiếm, trạng thái | FR-PRODUCT-01–04, BR-16, AC-02/24 | TODO | TODO | TODO | TODO |
-| FEAT-04 | Danh mục kho, tìm kiếm, trạng thái | FR-WH-01–03, BR-16, AC-02/24 | TODO | TODO | TODO | TODO |
-| FEAT-05 | Xem tồn thực tế, giữ chỗ và khả dụng | FR-INV-01–03, AC-03 | TODO | TODO | TODO | TODO |
-| FEAT-06 | Khởi tạo và điều chỉnh tồn kho | FR-INV-09/10, AC-16 | TODO | TODO | TODO | TODO |
-| FEAT-07 | Tạo/sửa nháp, submit, danh sách và chi tiết phiếu | FR-TR-01–04/11/12, AC-04/10/24 | TODO | TODO | TODO | TODO |
-| FEAT-08 | Approve và reserve nguyên tử | FR-INV-04, FR-TR-06, AC-05/06/17/18 | TODO | TODO | TODO | TODO |
-| FEAT-09 | Cancel và release | FR-INV-05, FR-TR-05/12, AC-07/20 | TODO | TODO | TODO | TODO |
-| FEAT-10 | Ship, receive và complete tự động | FR-INV-06/07, FR-TR-07–09, AC-08/09 | TODO | TODO | TODO | TODO |
-| FEAT-11 | Lịch sử phiếu, biến động và audit | FR-TR-10, FR-INV-11, NFR-06, AC-25 | TODO | TODO | TODO | TODO |
-| FEAT-12 | Hàng đang vận chuyển | FR-INV-11, AC-25 | TODO | TODO | TODO | TODO |
-| FEAT-13 | Operation, lỗi, đối soát và phục hồi cho Admin | FR-TR-13, mục 7/8, AC-19/21/22/26 | TODO | TODO | TODO | TODO |
-| FEAT-14 | Phân trang, bộ lọc, trạng thái tải/rỗng/lỗi/mất mạng | mục 11.7, AC-27; bổ sung mobile | TODO | TODO | TODO | TODO |
+| Mã      | Nhóm chức năng                                             | Tham chiếu SRS                      | Backend     | Web  | Android | Kiểm thử    |
+| ------- | ---------------------------------------------------------- | ----------------------------------- | ----------- | ---- | ------- | ----------- |
+| FEAT-01 | Đăng nhập, thông tin tài khoản, đăng xuất, quyền hiện hành | FR-AUTH-01/02, NFR-01, AC-01/23     | IN_PROGRESS | TODO | TODO    | IN_PROGRESS |
+| FEAT-02 | Quản lý người dùng, role, kho và quyền bổ sung             | FR-AUTH-03, mục 2.4                 | TODO        | TODO | TODO    | TODO        |
+| FEAT-03 | Danh mục sản phẩm, tìm kiếm, trạng thái                    | FR-PRODUCT-01–04, BR-16, AC-02/24   | TODO        | TODO | TODO    | TODO        |
+| FEAT-04 | Danh mục kho, tìm kiếm, trạng thái                         | FR-WH-01–03, BR-16, AC-02/24        | TODO        | TODO | TODO    | TODO        |
+| FEAT-05 | Xem tồn thực tế, giữ chỗ và khả dụng                       | FR-INV-01–03, AC-03                 | TODO        | TODO | TODO    | TODO        |
+| FEAT-06 | Khởi tạo và điều chỉnh tồn kho                             | FR-INV-09/10, AC-16                 | TODO        | TODO | TODO    | TODO        |
+| FEAT-07 | Tạo/sửa nháp, submit, danh sách và chi tiết phiếu          | FR-TR-01–04/11/12, AC-04/10/24      | TODO        | TODO | TODO    | TODO        |
+| FEAT-08 | Approve và reserve nguyên tử                               | FR-INV-04, FR-TR-06, AC-05/06/17/18 | TODO        | TODO | TODO    | TODO        |
+| FEAT-09 | Cancel và release                                          | FR-INV-05, FR-TR-05/12, AC-07/20    | TODO        | TODO | TODO    | TODO        |
+| FEAT-10 | Ship, receive và complete tự động                          | FR-INV-06/07, FR-TR-07–09, AC-08/09 | TODO        | TODO | TODO    | TODO        |
+| FEAT-11 | Lịch sử phiếu, biến động và audit                          | FR-TR-10, FR-INV-11, NFR-06, AC-25  | TODO        | TODO | TODO    | TODO        |
+| FEAT-12 | Hàng đang vận chuyển                                       | FR-INV-11, AC-25                    | TODO        | TODO | TODO    | TODO        |
+| FEAT-13 | Operation, lỗi, đối soát và phục hồi cho Admin             | FR-TR-13, mục 7/8, AC-19/21/22/26   | TODO        | TODO | TODO    | TODO        |
+| FEAT-14 | Phân trang, bộ lọc, trạng thái tải/rỗng/lỗi/mất mạng       | mục 11.7, AC-27; bổ sung mobile     | TODO        | TODO | TODO    | TODO        |
 
 Low stock trong FR-INV-08 vẫn là tùy chọn, không được tự đưa vào phần bắt buộc hoặc ảnh hưởng nghiệm thu các chức năng chính.
 
@@ -278,16 +278,16 @@ Với mỗi phần được chuyển sang `DONE`, bổ sung mã kiểm thử ho�
 
 Làm theo từng nhóm chức năng xuyên backend, web và Android. Kiểm thử được thực hiện trong từng tuần; tuần 7 dành cho hồi quy và đánh giá toàn hệ thống.
 
-| Mốc | Nội dung | Điều kiện hoàn thành | Trạng thái |
-|---|---|---|---|
-| W1 — Nền tảng | Đồng bộ tài liệu; thống nhất kiến trúc; khởi tạo workspace, Compose, migration, OpenAPI và hai giao diện | Web/Android gọi được Gateway; build và cài được APK thử nghiệm | IN_PROGRESS |
-| W2 — Tài khoản và danh mục | Auth, quyền theo kho, người dùng, sản phẩm và kho trên hai nền tảng | Ba vai trò đăng nhập và thao tác đúng quyền; dữ liệu dùng chung | TODO |
-| W3 — Tồn kho và phiếu nháp | Khởi tạo/điều chỉnh tồn, lịch sử; tạo/sửa/submit phiếu | Có dữ liệu demo và phiếu nhiều sản phẩm từ cả web/Android | TODO |
-| W4 — Luồng chuyển kho | Reserve, approve, cancel, ship, receive; outbox, chống trùng và operation | Một phiếu chạy hết luồng qua hai nền tảng; số dư đúng, không xử lý lặp | TODO |
-| W5 — Phục hồi và tranh chấp | Retry/DLQ, đối soát, màn hình phục hồi, hoàn thiện vô hiệu hóa danh mục | Restart không mất/lặp giao dịch; không vô hiệu hóa tài nguyên đang dùng | TODO |
-| W6 — Hoàn thiện giao diện | Bộ lọc, phân trang, audit, hàng đang vận chuyển, trạng thái tải/rỗng/lỗi | Đủ chức năng theo ma trận; không còn phần bắt buộc chỉ làm qua API | TODO |
-| W7 — Nghiệm thu hệ thống | Đồng thời, phân quyền, restart, hiệu năng, mạng Android, hồi quy | Có báo cáo đối chiếu các tiêu chí SRS và tiêu chí mobile bổ sung | TODO |
-| W8 — Đóng gói và bàn giao | APK release, cài mới, tài liệu local, dữ liệu demo và kịch bản báo cáo | Chạy từ hướng dẫn; APK độc lập với Metro/dev server | TODO |
+| Mốc                         | Nội dung                                                                                                 | Điều kiện hoàn thành                                                    | Trạng thái  |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------- |
+| W1 — Nền tảng               | Đồng bộ tài liệu; thống nhất kiến trúc; khởi tạo workspace, Compose, migration, OpenAPI và hai giao diện | Web/Android gọi được Gateway; build và cài được APK thử nghiệm          | IN_PROGRESS |
+| W2 — Tài khoản và danh mục  | Auth, quyền theo kho, người dùng, sản phẩm và kho trên hai nền tảng                                      | Ba vai trò đăng nhập và thao tác đúng quyền; dữ liệu dùng chung         | TODO        |
+| W3 — Tồn kho và phiếu nháp  | Khởi tạo/điều chỉnh tồn, lịch sử; tạo/sửa/submit phiếu                                                   | Có dữ liệu demo và phiếu nhiều sản phẩm từ cả web/Android               | TODO        |
+| W4 — Luồng chuyển kho       | Reserve, approve, cancel, ship, receive; outbox, chống trùng và operation                                | Một phiếu chạy hết luồng qua hai nền tảng; số dư đúng, không xử lý lặp  | TODO        |
+| W5 — Phục hồi và tranh chấp | Retry/DLQ, đối soát, màn hình phục hồi, hoàn thiện vô hiệu hóa danh mục                                  | Restart không mất/lặp giao dịch; không vô hiệu hóa tài nguyên đang dùng | TODO        |
+| W6 — Hoàn thiện giao diện   | Bộ lọc, phân trang, audit, hàng đang vận chuyển, trạng thái tải/rỗng/lỗi                                 | Đủ chức năng theo ma trận; không còn phần bắt buộc chỉ làm qua API      | TODO        |
+| W7 — Nghiệm thu hệ thống    | Đồng thời, phân quyền, restart, hiệu năng, mạng Android, hồi quy                                         | Có báo cáo đối chiếu các tiêu chí SRS và tiêu chí mobile bổ sung        | TODO        |
+| W8 — Đóng gói và bàn giao   | APK release, cài mới, tài liệu local, dữ liệu demo và kịch bản báo cáo                                   | Chạy từ hướng dẫn; APK độc lập với Metro/dev server                     | TODO        |
 
 ### 6.1. Cách chia nhỏ một mốc
 
@@ -304,15 +304,15 @@ Ví dụ W1 không được thực hiện trong một lần mà chia thành các
 
 ### 7.1. Chiến lược kiểm thử
 
-| Lớp kiểm tra | Công cụ/cách thực hiện | Nội dung |
-|---|---|---|
-| Nghiệp vụ backend | Jest | Workflow, quyền, validation và bất biến |
-| API và tích hợp | Supertest; PostgreSQL/RabbitMQ thật trong môi trường test riêng | Transaction, khóa, idempotency, outbox, retry và phục hồi |
-| Web component | Vitest + React Testing Library | Form, lỗi, trạng thái và hiển thị theo quyền |
-| Web end-to-end | Playwright | Luồng quản trị và chuyển kho qua Gateway |
-| Android component | Jest + React Native Testing Library | Form, điều hướng và trạng thái xử lý |
-| Android thực tế | APK cài trên thiết bị/emulator | Chức năng đầy đủ, Back, bàn phím, mất mạng, mở lại app |
-| Liên nền tảng | Kịch bản phối hợp web và APK | Cùng dữ liệu, quyền và kết quả nghiệp vụ |
+| Lớp kiểm tra      | Công cụ/cách thực hiện                                          | Nội dung                                                  |
+| ----------------- | --------------------------------------------------------------- | --------------------------------------------------------- |
+| Nghiệp vụ backend | Jest                                                            | Workflow, quyền, validation và bất biến                   |
+| API và tích hợp   | Supertest; PostgreSQL/RabbitMQ thật trong môi trường test riêng | Transaction, khóa, idempotency, outbox, retry và phục hồi |
+| Web component     | Vitest + React Testing Library                                  | Form, lỗi, trạng thái và hiển thị theo quyền              |
+| Web end-to-end    | Playwright                                                      | Luồng quản trị và chuyển kho qua Gateway                  |
+| Android component | Jest + React Native Testing Library                             | Form, điều hướng và trạng thái xử lý                      |
+| Android thực tế   | APK cài trên thiết bị/emulator                                  | Chức năng đầy đủ, Back, bàn phím, mất mạng, mở lại app    |
+| Liên nền tảng     | Kịch bản phối hợp web và APK                                    | Cùng dữ liệu, quyền và kết quả nghiệp vụ                  |
 
 Các test làm thay đổi dữ liệu dùng môi trường test riêng, không xóa hoặc reset dữ liệu demo/người dùng. Kiểm tra PostgreSQL/RabbitMQ thật là bắt buộc cho các kết luận về transaction và giao nhận message; test mock không thay thế được.
 
@@ -340,12 +340,12 @@ Các test làm thay đổi dữ liệu dùng môi trường test riêng, không 
 
 Giữ AC-01 đến AC-27. Các mã sau mới là dự kiến trong kế hoạch, chưa được ghi vào SRS:
 
-| Mã dự kiến | Tiêu chí |
-|---|---|
-| AC-28 | Web và Android đều cung cấp đầy đủ chức năng theo ma trận quyền, kể cả quản trị và phục hồi |
-| AC-29 | Một phiếu được xử lý luân phiên giữa hai nền tảng, số dư/trạng thái/lịch sử cuối cùng nhất quán |
-| AC-30 | App khôi phục trạng thái từ server khi mở lại/có mạng; hết phiên yêu cầu đăng nhập; không gửi lặp nghiệp vụ khi timeout |
-| AC-31 | APK cài trực tiếp, kết nối hệ thống local và chạy độc lập sau khi tắt Metro/dev server |
+| Mã dự kiến | Tiêu chí                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| AC-28      | Web và Android đều cung cấp đầy đủ chức năng theo ma trận quyền, kể cả quản trị và phục hồi                             |
+| AC-29      | Một phiếu được xử lý luân phiên giữa hai nền tảng, số dư/trạng thái/lịch sử cuối cùng nhất quán                         |
+| AC-30      | App khôi phục trạng thái từ server khi mở lại/có mạng; hết phiên yêu cầu đăng nhập; không gửi lặp nghiệp vụ khi timeout |
+| AC-31      | APK cài trực tiếp, kết nối hệ thống local và chạy độc lập sau khi tắt Metro/dev server                                  |
 
 ### 7.4. Checklist bàn giao
 
@@ -363,52 +363,52 @@ Giữ AC-01 đến AC-27. Các mã sau mới là dự kiến trong kế hoạch,
 
 **SRS hiện được giữ nguyên ở phiên bản 1.1.** Việc cập nhật SRS là một bước riêng; hoàn thiện `plan.md` không tự thực hiện các thay đổi sau.
 
-| Khu vực SRS | Nội dung cần đồng bộ lên 1.2 |
-|---|---|
-| Giới thiệu, phạm vi, kiến trúc | Hai client web/Android dùng chung Gateway và backend |
-| Vai trò và chức năng | Ma trận quyền áp dụng trên cả hai nền tảng, mobile có cả quản trị |
-| Auth/API | `/api/auth/me`, access token 30 phút, không refresh token, hành vi đăng nhập lại và logout client |
-| Transfer/API | Lọc theo trạng thái operation, xử lý timeout và polling từ hai client |
-| Công nghệ | Thay stack Spring Boot/Spring Security tham khảo bằng NestJS/TypeScript; chốt React và Expo |
-| Database và Compose | Một PostgreSQL instance local, 5 database/user riêng; vẫn giữ database-per-service |
-| Phạm vi MVP | Đưa Android vào bắt buộc; bỏ Mobile App khỏi danh sách ngoài phạm vi |
-| Phi chức năng | Vòng đời app, mất mạng, cache theo tài khoản, địa chỉ API theo môi trường |
-| Nghiệm thu và bàn giao | Bổ sung AC-28–31, APK độc lập và kịch bản liên nền tảng |
+| Khu vực SRS                    | Nội dung cần đồng bộ lên 1.2                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Giới thiệu, phạm vi, kiến trúc | Hai client web/Android dùng chung Gateway và backend                                              |
+| Vai trò và chức năng           | Ma trận quyền áp dụng trên cả hai nền tảng, mobile có cả quản trị                                 |
+| Auth/API                       | `/api/auth/me`, access token 30 phút, không refresh token, hành vi đăng nhập lại và logout client |
+| Transfer/API                   | Lọc theo trạng thái operation, xử lý timeout và polling từ hai client                             |
+| Công nghệ                      | Thay stack Spring Boot/Spring Security tham khảo bằng NestJS/TypeScript; chốt React và Expo       |
+| Database và Compose            | Một PostgreSQL instance local, 5 database/user riêng; vẫn giữ database-per-service                |
+| Phạm vi MVP                    | Đưa Android vào bắt buộc; bỏ Mobile App khỏi danh sách ngoài phạm vi                              |
+| Phi chức năng                  | Vòng đời app, mất mạng, cache theo tài khoản, địa chỉ API theo môi trường                         |
+| Nghiệm thu và bàn giao         | Bổ sung AC-28–31, APK độc lập và kịch bản liên nền tảng                                           |
 
 Khi đồng bộ, rà lại toàn bộ các chỗ đề cập “frontend” để xác định áp dụng cho cả hai client; không chỉ thêm một mục Mobile rồi để các phần còn lại mâu thuẫn.
 
 ## 9. Rủi ro và cách xử lý
 
-| Rủi ro | Cách xử lý trong kế hoạch |
-|---|---|
-| Một người làm 5 service và 2 giao diện | Chia theo luồng chức năng; kiểm tra cả hai client sớm; đánh giá lại W1/W4 |
-| Chưa quen NestJS hoặc Expo | Dành thời gian giải thích kiến trúc và làm một luồng nhỏ trước khi nhân rộng |
-| Lệch phiên bản Expo/React Native/package dùng chung | Chốt bộ phiên bản tương thích ở bước khởi tạo, giữ lockfile và tránh nâng major |
-| Docker và Android emulator dùng nhiều tài nguyên | Một PostgreSQL instance; đo tài nguyên thực tế; ưu tiên thiết bị Android thật nếu emulator nặng |
-| Build Android hoặc kết nối LAN gặp lỗi | Build/cài APK thử nghiệm ngay W1; kiểm tra API URL và cấu hình mạng trước khi có nhiều màn hình |
-| Tồn kho sai khi nhiều request hoặc service dừng | Transaction, khóa, outbox, idempotency và test tích hợp từ lúc xây luồng |
-| Tham chiếu danh mục bị treo do lỗi giữa các service | Thiết kế đối soát; không xóa tham chiếu chưa xác minh chỉ vì hết thời gian |
-| Mobile bỏ sót chức năng quản trị | Ma trận Backend/Web/Android/Test riêng cho từng nhóm; chưa đủ thì chưa DONE |
-| Chậm tiến độ | Điều chỉnh lịch và độ trau chuốt UI; giữ các yêu cầu nghiệp vụ bắt buộc |
+| Rủi ro                                              | Cách xử lý trong kế hoạch                                                                       |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Một người làm 5 service và 2 giao diện              | Chia theo luồng chức năng; kiểm tra cả hai client sớm; đánh giá lại W1/W4                       |
+| Chưa quen NestJS hoặc Expo                          | Dành thời gian giải thích kiến trúc và làm một luồng nhỏ trước khi nhân rộng                    |
+| Lệch phiên bản Expo/React Native/package dùng chung | Chốt bộ phiên bản tương thích ở bước khởi tạo, giữ lockfile và tránh nâng major                 |
+| Docker và Android emulator dùng nhiều tài nguyên    | Một PostgreSQL instance; đo tài nguyên thực tế; ưu tiên thiết bị Android thật nếu emulator nặng |
+| Build Android hoặc kết nối LAN gặp lỗi              | Build/cài APK thử nghiệm ngay W1; kiểm tra API URL và cấu hình mạng trước khi có nhiều màn hình |
+| Tồn kho sai khi nhiều request hoặc service dừng     | Transaction, khóa, outbox, idempotency và test tích hợp từ lúc xây luồng                        |
+| Tham chiếu danh mục bị treo do lỗi giữa các service | Thiết kế đối soát; không xóa tham chiếu chưa xác minh chỉ vì hết thời gian                      |
+| Mobile bỏ sót chức năng quản trị                    | Ma trận Backend/Web/Android/Test riêng cho từng nhóm; chưa đủ thì chưa DONE                     |
+| Chậm tiến độ                                        | Điều chỉnh lịch và độ trau chuốt UI; giữ các yêu cầu nghiệp vụ bắt buộc                         |
 
 ## 10. Nhật ký quyết định
 
-| Mã | Ngày | Quyết định | Cơ sở |
-|---|---|---|---|
-| DEC-01 | 2026-09-17 | Android là nền tảng mobile của MVP | Người dùng chọn app Android riêng |
-| DEC-02 | 2026-09-17 | Web và Android có đầy đủ chức năng theo quyền | Người dùng yêu cầu đầy đủ trên cả hai |
-| DEC-03 | 2026-09-17 | Dùng TypeScript cho backend/web/mobile | Người dùng quen React/JavaScript, làm một mình |
-| DEC-04 | 2026-09-17 | NestJS, React và React Native/Expo | Hướng công nghệ đã được thống nhất |
-| DEC-05 | 2026-09-17 | Bàn giao local + APK | Chưa cần cloud hoặc Google Play |
-| DEC-06 | 2026-09-17 | Lộ trình mục tiêu 8 tuần | Khoảng thời gian dự kiến 5–8 tuần; chưa có quỹ giờ cố định |
-| DEC-07 | 2026-09-17 | Một PostgreSQL instance, 5 database/user riêng khi chạy local | Giảm tài nguyên, vẫn giữ quyền sở hữu dữ liệu riêng |
-| DEC-08 | 2026-09-17 | Access token 30 phút, chưa có refresh token | Giới hạn MVP trong kế hoạch đã thống nhất |
-| DEC-09 | 2026-09-17 | Làm từng bước, giải thích và thống nhất trước khi triển khai | Người dùng yêu cầu đồng hành chậm, không tự triển khai cả kế hoạch |
-| DEC-10 | 2026-09-17 | Tài liệu theo dõi tên `plan.md` | Theo yêu cầu mới nhất; dùng thay tên `DEVELOPMENT_PLAN.md` trước đó |
-| DEC-11 | 2026-09-19 | Giữ GPS ngoài phạm vi; tiếp tục theo dõi trạng thái phiếu, lịch sử xử lý và biến động tồn | Người dùng quyết định không bổ sung tracking GPS sau khi trao đổi phạm vi và chi phí |
-| DEC-12 | 2026-09-19 | Xem thiết kế database tổng thể 5 service trước, sau đó chi tiết và code từng phần | Người dùng đồng ý cách làm tổng quan trước; Inventory và Transfer được thiết kế nghiệp vụ cùng nhau, triển khai từng chức năng nhỏ |
-| DEC-13 | 2026-09-22 | Seed Admin đọc SEED_ADMIN_* từ .env; băm bằng scrypt có sẵn trong Node.js | Người dùng muốn file seed để tiện test API và nhớ thông tin local; không thêm dependency, không hardcode mật khẩu, không reset tài khoản đã có |
-| DEC-14 | 2026-09-23 | Chuyển ORM từ TypeORM sang Prisma, bắt đầu ở Auth | Người dùng chọn Prisma. Dùng dòng 7 được hỗ trợ; giữ database/Admin và chuyển từng bước, người dùng cài dependency thủ công |
+| Mã     | Ngày       | Quyết định                                                                                | Cơ sở                                                                                                                                          |
+| ------ | ---------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| DEC-01 | 2026-09-17 | Android là nền tảng mobile của MVP                                                        | Người dùng chọn app Android riêng                                                                                                              |
+| DEC-02 | 2026-09-17 | Web và Android có đầy đủ chức năng theo quyền                                             | Người dùng yêu cầu đầy đủ trên cả hai                                                                                                          |
+| DEC-03 | 2026-09-17 | Dùng TypeScript cho backend/web/mobile                                                    | Người dùng quen React/JavaScript, làm một mình                                                                                                 |
+| DEC-04 | 2026-09-17 | NestJS, React và React Native/Expo                                                        | Hướng công nghệ đã được thống nhất                                                                                                             |
+| DEC-05 | 2026-09-17 | Bàn giao local + APK                                                                      | Chưa cần cloud hoặc Google Play                                                                                                                |
+| DEC-06 | 2026-09-17 | Lộ trình mục tiêu 8 tuần                                                                  | Khoảng thời gian dự kiến 5–8 tuần; chưa có quỹ giờ cố định                                                                                     |
+| DEC-07 | 2026-09-17 | Một PostgreSQL instance, 5 database/user riêng khi chạy local                             | Giảm tài nguyên, vẫn giữ quyền sở hữu dữ liệu riêng                                                                                            |
+| DEC-08 | 2026-09-17 | Access token 30 phút, chưa có refresh token                                               | Giới hạn MVP trong kế hoạch đã thống nhất                                                                                                      |
+| DEC-09 | 2026-09-17 | Làm từng bước, giải thích và thống nhất trước khi triển khai                              | Người dùng yêu cầu đồng hành chậm, không tự triển khai cả kế hoạch                                                                             |
+| DEC-10 | 2026-09-17 | Tài liệu theo dõi tên `plan.md`                                                           | Theo yêu cầu mới nhất; dùng thay tên `DEVELOPMENT_PLAN.md` trước đó                                                                            |
+| DEC-11 | 2026-09-19 | Giữ GPS ngoài phạm vi; tiếp tục theo dõi trạng thái phiếu, lịch sử xử lý và biến động tồn | Người dùng quyết định không bổ sung tracking GPS sau khi trao đổi phạm vi và chi phí                                                           |
+| DEC-12 | 2026-09-19 | Xem thiết kế database tổng thể 5 service trước, sau đó chi tiết và code từng phần         | Người dùng đồng ý cách làm tổng quan trước; Inventory và Transfer được thiết kế nghiệp vụ cùng nhau, triển khai từng chức năng nhỏ             |
+| DEC-13 | 2026-09-22 | Seed Admin đọc SEED*ADMIN*\* từ .env; băm bằng scrypt có sẵn trong Node.js                | Người dùng muốn file seed để tiện test API và nhớ thông tin local; không thêm dependency, không hardcode mật khẩu, không reset tài khoản đã có |
+| DEC-14 | 2026-09-23 | Chuyển ORM từ TypeORM sang Prisma, bắt đầu ở Auth                                         | Người dùng chọn Prisma. Dùng dòng 7 được hỗ trợ; giữ database/Admin và chuyển từng bước, người dùng cài dependency thủ công                    |
 
 Khi có quyết định mới, thêm một dòng thay vì âm thầm đổi lựa chọn cũ. Nếu thay đổi yêu cầu nghiệp vụ, cập nhật cả SRS ở bước tương ứng.
 
