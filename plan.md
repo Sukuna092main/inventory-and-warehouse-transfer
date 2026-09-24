@@ -110,7 +110,7 @@ Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web v�
 ### 3.1. Lý do chọn hướng này
 
 - Phù hợp kiến thức React/JavaScript hiện có; không thêm Java hoặc Dart vào giai đoạn MVP.
-- NestJS tổ chức backend theo module. Theo lựa chọn ngày 2026-09-23, dùng Prisma ORM 7 để truy vấn và quản lý migration; các thao tác cần transaction/khóa PostgreSQL vẫn phải thiết kế theo nghiệp vụ. Auth hiện dùng TypeORM và đang chuẩn bị chuyển theo [kế hoạch đổi ORM](./docs/prisma-transition.md). Xem [trạng thái phát hành Prisma](https://www.prisma.io/docs/orm/release-status).
+- NestJS tổ chức backend theo module. Theo lựa chọn ngày 2026-09-23, dùng Prisma ORM 7 để truy vấn và quản lý migration; các thao tác cần transaction/khóa PostgreSQL vẫn phải thiết kế theo nghiệp vụ. Auth đã chuyển mã chạy, test và dependency sang Prisma theo [kế hoạch đổi ORM](./docs/prisma-transition.md). Xem [trạng thái phát hành Prisma](https://www.prisma.io/docs/orm/release-status).
 - Web và Android có thể dùng chung kiểu dữ liệu, API client và quy tắc validation phía giao diện. Bố cục và component hiển thị được phát triển riêng theo nền tảng.
 - Expo hỗ trợ pnpm monorepo và build Android tại máy. APK bàn giao phải chạy độc lập; Expo Go chỉ là lựa chọn thử nghiệm ban đầu. Xem [Expo Monorepos](https://docs.expo.dev/guides/monorepos/) và [Build Local](https://docs.expo.dev/guides/local-app-overview/).
 - Material UI và React Native Paper cung cấp component để tập trung vào chức năng nghiệp vụ. Chỉ dùng thành phần miễn phí và bản stable. Xem [Material UI](https://mui.com/material-ui/getting-started/) và [React Native Paper](https://oss.callstack.com/react-native-paper/).
@@ -246,7 +246,8 @@ Tất cả nhóm chức năng dưới đây đều có trên cả web và Androi
 | PREP-11 | Tạo thư mục giữ chỗ cho các thành phần còn lại | DONE | Ngày 2026-09-22: bốn service, Gateway, web và mobile có README mô tả trách nhiệm và trạng thái Chưa triển khai; chưa khởi tạo ứng dụng hoặc cấu hình workspace |
 | PREP-12 | Entity và migration đầu tiên cho Auth | DONE | Người dùng đã chạy migration; kiểm tra chỉ đọc ngày 2026-09-22 xác nhận ba bảng nghiệp vụ, auth_migrations, bản ghi CreateAuthTables1790035200000 và trigger bảo vệ audit đang bật. Trước đó 39 ca kiểm tra PostgreSQL, build, lint, unit/e2e đạt; xem docs/auth-database-migration.md |
 | PREP-13 | Seed Admin đầu tiên từ cấu hình local | DONE | Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Unit test và 8 ca seed trên PostgreSQL đã đạt, bao gồm chạy đồng thời; xem docs/seed-admin.md |
-| PREP-14 | Chuyển Auth từ TypeORM sang Prisma | IN_PROGRESS | Kết nối và truy vấn đăng nhập đã chuyển sang Prisma. Hợp đồng HTTP giữ nguyên; 26 unit test, 69 ca database, 1 e2e, build và lint đạt. Seed, baseline migration và test setup còn dùng TypeORM; chưa gỡ dependency. Xem docs/prisma-connection.md và docs/prisma-transition.md |
+| PREP-14 | Chuyển Auth từ TypeORM sang Prisma | DONE | Baseline `0_auth_baseline` đã applied trong `auth_db`; login, seed và test setup dùng Prisma/baseline SQL. Source, manifest và lockfile không còn TypeORM. Sau khi gỡ dependency: 26 unit, 68 database, 1 e2e, build và lint đạt. Xem docs/prisma-baseline.md và docs/prisma-transition.md |
+| PREP-15 | Gateway chuyển tiếp login và me của Auth | IN_PROGRESS | Đã chuẩn bị ứng dụng NestJS, JWT sơ bộ, CORS, correlation ID; kiểm tra kiểu và 5 ca HTTP đạt khi dùng package NestJS sẵn có của Auth. Chờ người dùng cài dependency/cấu hình local để chạy `pnpm build` và `pnpm test` trong Gateway. Xem apps/api-gateway/README.md |
 
 ### 5.2. Theo dõi triển khai theo chức năng
 
@@ -415,7 +416,9 @@ Khi có quyết định mới, thêm một dòng thay vì âm thầm đổi lự
 
 **Mốc vừa hoàn thành:** Đã triển khai `POST /api/auth/login`: username/email, kiểm tra mật khẩu và tài khoản ACTIVE, JWT HS256 có hạn 30 phút, validation và lỗi theo SRS. Đã đạt 26 unit test, 69 ca database (gồm 22 ca HTTP đăng nhập) và 1 e2e GET `/`. Khóa ký và tài khoản thử trong test độc lập với cấu hình/dữ liệu thật. FEAT-01 vẫn IN_PROGRESS vì còn thông tin tài khoản, guard/quyền hiện hành và hai giao diện.
 
-**Mốc vừa hoàn thành: API đăng nhập đọc người dùng bằng Prisma.** Truy vấn chọn rõ ID, trạng thái và password hash để xác minh; client mặc định bỏ hash khỏi kết quả truy vấn khác. 22 ca HTTP đăng nhập chạy trên PostgreSQL thật đều đạt, cùng 26 unit test, 69 ca database, 1 e2e, build và lint. Bước tiếp theo của PREP-14 là chuyển seed Admin sang Prisma trong một transaction; baseline migration và dọn TypeORM được xử lý sau. Xem [tài liệu đăng nhập](./docs/auth-login.md) và [kế hoạch chuyển ORM](./docs/prisma-transition.md).
+**Mốc vừa hoàn thành: chuyển Auth sang Prisma.** Truy vấn chỉ đọc xác nhận `0_auth_baseline` đã applied. Ba bộ test database dựng schema riêng từ `migration.sql`; một ca down/up đặc thù TypeORM được bỏ. Người dùng đã gỡ hai dependency TypeORM; kiểm tra sau khi gỡ đạt 26 unit, 68 database, 1 e2e, build và lint. PREP-14 DONE. Xem [kế hoạch chuyển ORM](./docs/prisma-transition.md).
+
+**Mốc vừa hoàn thành: `GET /api/auth/me`.** Bearer JWT được xác minh tại Auth; mỗi request đọc lại trạng thái, role, kho và quyền bổ sung qua Prisma. Token sai/hết hạn, tài khoản INACTIVE và quyền bị thu hồi được kiểm tra trên PostgreSQL tạm; 77 ca database đạt. Xem [hướng dẫn `/me`](./docs/auth-me.md). FEAT-01 vẫn IN_PROGRESS cho tới khi web/Android tích hợp và kiểm thử.
 
 - Đọc [database tổng quan](./docs/database-overview.md): service sở hữu từng nhóm bảng, quan hệ nội bộ/liên service, command/result và ví dụ chuyển kho.
 - Có thể dán [database.dbml](./docs/database.dbml) vào dbdiagram để xem 26 bảng trong 5 nhóm service. Nét đứt chỉ là tham chiếu logic liên service; các cột ngoài Auth còn là đề xuất, không xuất nguyên sơ đồ thành migration.

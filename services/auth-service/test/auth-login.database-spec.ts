@@ -3,66 +3,59 @@ import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { DataSource } from 'typeorm';
 import request from 'supertest';
 import type { App } from 'supertest/types';
-import configuredDataSource from '../src/database/data-source';
 import { AuthModule } from '../src/auth/auth.module';
-import { User } from '../src/users/entities/user.entity';
-import { UserAuditLog } from '../src/users/entities/user-audit-log.entity';
 import { hashPassword } from '../src/auth/password';
 import { configureApp } from '../src/configure-app';
 import { jwtOptions } from '../src/auth/jwt.config';
 import { AuthPrismaService } from '../src/database/prisma/auth-prisma.service';
 import { createAuthPrisma } from '../src/database/prisma/prisma-client';
 import type { PrismaClient } from '../src/generated/prisma/client';
+import {
+  createCommittedTestSchema,
+  dropTestSchema,
+  newTestSchema,
+  openTestPostgres,
+  testDatabaseConfig,
+} from './postgres-test';
+import type { TestPgClient } from './postgres-test';
 
 describe('POST /api/auth/login with PostgreSQL', () => {
-  const schema = `login_test_${randomUUID().replaceAll('-', '')}`;
+  const schema = newTestSchema('login');
   const secret = randomBytes(32).toString('hex');
   const password = ' mat-khau-test-login-🙂 ';
   const userId = randomUUID();
-  let db: DataSource;
+  let db: TestPgClient;
   let app: INestApplication<App>;
   let prisma: PrismaClient;
   let created = false;
 
   beforeAll(async () => {
-    const options = configuredDataSource.options;
-    if (options.type !== 'postgres') throw new Error('PostgreSQL required');
-    db = new DataSource({ ...options, schema, logging: false });
-    await db.initialize();
-    await db.query(`CREATE SCHEMA "${schema}"`);
+    db = await openTestPostgres();
+    await createCommittedTestSchema(db, schema);
     created = true;
-    await db.runMigrations();
     const passwordHash = await hashPassword(password);
-    await db.manager.insert(User, [
-      {
-        id: userId,
-        username: 'login_admin',
-        email: 'login@example.test',
-        passwordHash,
-        role: 'ADMIN',
-      },
-      {
-        id: randomUUID(),
-        username: 'disabled_admin',
-        email: 'disabled@example.test',
-        passwordHash,
-        role: 'ADMIN',
-        status: 'INACTIVE',
-      },
-    ]);
-    prisma = createAuthPrisma(
-      {
-        DB_HOST: options.host ?? '127.0.0.1',
-        DB_PORT: options.port ?? 5432,
-        DB_NAME: options.database ?? 'auth_db',
-        DB_USERNAME: options.username ?? '',
-        DB_PASSWORD: options.password ?? '',
-      },
-      schema,
-    );
+    prisma = createAuthPrisma(testDatabaseConfig(), schema);
+    await prisma.user.createMany({
+      data: [
+        {
+          id: userId,
+          username: 'login_admin',
+          email: 'login@example.test',
+          passwordHash,
+          role: 'ADMIN',
+        },
+        {
+          id: randomUUID(),
+          username: 'disabled_admin',
+          email: 'disabled@example.test',
+          passwordHash,
+          role: 'ADMIN',
+          status: 'INACTIVE',
+        },
+      ],
+    });
     const module = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
@@ -84,15 +77,11 @@ describe('POST /api/auth/login with PostgreSQL', () => {
 
   afterAll(async () => {
     try {
-      if (created && db?.isInitialized) {
-        if (!/^login_test_[a-f0-9]{32}$/.test(schema))
-          throw new Error('Invalid test schema');
-        await db.query(`DROP SCHEMA "${schema}" CASCADE`);
-      }
-    } finally {
       if (app) await app.close();
       if (prisma) await prisma.$disconnect();
-      if (db?.isInitialized) await db.destroy();
+      if (created && db) await dropTestSchema(db, schema);
+    } finally {
+      if (db) await db.end();
     }
   });
 
@@ -130,7 +119,7 @@ describe('POST /api/auth/login with PostgreSQL', () => {
         'iss',
         'sub',
       ]);
-      expect(await db.manager.count(UserAuditLog)).toBe(0);
+      expect(await prisma.userAuditLog.count()).toBe(0);
     },
   );
 
@@ -208,6 +197,149 @@ describe('POST /api/auth/login with PostgreSQL', () => {
       expect(response.body).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
       expect(JSON.stringify(response.body)).not.toContain('SELECT');
       expect(JSON.stringify(response.body)).not.toContain(password);
+    } finally {
+      await db.query(
+        `ALTER TABLE "${schema}".users_unavailable RENAME TO users`,
+      );
+    }
+  });
+
+  it('returns the current account from a login token without sensitive fields', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ identifier: 'login_admin', password })
+      .expect(200);
+    const response = await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(200);
+    expect(response.body).toEqual({
+      id: userId,
+      username: 'login_admin',
+      email: 'login@example.test',
+      role: 'ADMIN',
+      assignedWarehouseId: null,
+      status: 'ACTIVE',
+      additionalPermissions: [],
+    });
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(JSON.stringify(response.body)).not.toContain(password);
+    expect(response.body).not.toHaveProperty('passwordHash');
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `bearer ${login.body.accessToken}`)
+      .expect(200);
+  });
+
+  it('reads changed role, warehouse and permissions on every request', async () => {
+    const token = await new JwtService(jwtOptions(secret)).signAsync({
+      sub: userId,
+    });
+    const warehouseId = randomUUID();
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: 'WAREHOUSE_MANAGER', assignedWarehouseId: warehouseId },
+    });
+    await prisma.userPermission.create({
+      data: {
+        userId,
+        permission: 'VIEW_OTHER_INVENTORY',
+        grantedBy: userId,
+      },
+    });
+    try {
+      const first = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(first.body).toMatchObject({
+        role: 'WAREHOUSE_MANAGER',
+        assignedWarehouseId: warehouseId,
+        additionalPermissions: ['VIEW_OTHER_INVENTORY'],
+      });
+      await prisma.userPermission.delete({
+        where: {
+          userId_permission: { userId, permission: 'VIEW_OTHER_INVENTORY' },
+        },
+      });
+      const second = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(second.body.additionalPermissions).toEqual([]);
+    } finally {
+      await prisma.userPermission.deleteMany({ where: { userId } });
+      await prisma.user.update({
+        where: { id: userId },
+        data: { role: 'ADMIN', assignedWarehouseId: null },
+      });
+    }
+  });
+
+  it('rejects a disabled account even while its token remains valid', async () => {
+    const token = await new JwtService(jwtOptions(secret)).signAsync({
+      sub: userId,
+    });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { status: 'INACTIVE' },
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(401);
+      expect(response.body).toMatchObject({ code: 'UNAUTHORIZED' });
+    } finally {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { status: 'ACTIVE' },
+      });
+    }
+  });
+
+  it.each([undefined, 'Token value', 'Bearer ', 'Bearer a b'])(
+    'rejects a missing or malformed Authorization header %#',
+    async (authorization) => {
+      const call = request(app.getHttpServer()).get('/api/auth/me');
+      if (authorization !== undefined) call.set('Authorization', authorization);
+      const response = await call.expect(401);
+      expect(response.body).toMatchObject({ code: 'UNAUTHORIZED' });
+    },
+  );
+
+  it('rejects wrong signature, expired token and invalid subject', async () => {
+    const jwt = new JwtService(jwtOptions(secret));
+    const tokens = [
+      await new JwtService(
+        jwtOptions(randomBytes(32).toString('hex')),
+      ).signAsync({
+        sub: userId,
+      }),
+      await jwt.signAsync({ sub: userId }, { expiresIn: -1 }),
+      await jwt.signAsync({ sub: 'not-a-user-id' }),
+    ];
+    for (const token of tokens) {
+      const response = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(401);
+      expect(response.body).toMatchObject({ code: 'UNAUTHORIZED' });
+    }
+  });
+
+  it('returns a safe 503 when current account cannot be read', async () => {
+    const token = await new JwtService(jwtOptions(secret)).signAsync({
+      sub: userId,
+    });
+    await db.query(`ALTER TABLE "${schema}".users RENAME TO users_unavailable`);
+    try {
+      const response = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(503);
+      expect(response.body).toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+      expect(JSON.stringify(response.body)).not.toContain('SELECT');
     } finally {
       await db.query(
         `ALTER TABLE "${schema}".users_unavailable RENAME TO users`,

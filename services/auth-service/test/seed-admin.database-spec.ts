@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { DataSource } from 'typeorm';
-import configuredDataSource from '../src/database/data-source';
 import { createInitialAdmin } from '../src/database/seeds/create-initial-admin';
 import { verifyPassword } from '../src/auth/password';
-import { User } from '../src/users/entities/user.entity';
-import { UserAuditLog } from '../src/users/entities/user-audit-log.entity';
-import { UserPermission } from '../src/users/entities/user-permission.entity';
+import { createAuthPrisma } from '../src/database/prisma/prisma-client';
+import type { PrismaClient } from '../src/generated/prisma/client';
+import {
+  createCommittedTestSchema,
+  dropTestSchema,
+  newTestSchema,
+  openTestPostgres,
+  testDatabaseConfig,
+} from './postgres-test';
+import type { TestPgClient } from './postgres-test';
 
 describe('Seed Admin on PostgreSQL', () => {
   const env = {
@@ -13,52 +18,54 @@ describe('Seed Admin on PostgreSQL', () => {
     SEED_ADMIN_EMAIL: ' Admin@Example.Test ',
     SEED_ADMIN_PASSWORD: 'mat-khau-seed-test-rieng',
   };
-  let db: DataSource;
+  let db: TestPgClient;
+  let prisma: PrismaClient;
   let schema: string;
   let created: boolean;
 
   beforeEach(async () => {
     // A committed, isolated schema lets two real connections test concurrent seeds.
     // Cleanup only ever drops this exact random schema, never public or auth_db.
-    schema = `seed_test_${randomUUID().replaceAll('-', '')}`;
+    schema = newTestSchema('seed');
     created = false;
-    const options = configuredDataSource.options;
-    if (options.type !== 'postgres') throw new Error('PostgreSQL required');
-    db = new DataSource({ ...options, schema, logging: false });
-    await db.initialize();
-    await db.query(`CREATE SCHEMA "${schema}"`);
+    db = await openTestPostgres();
+    await createCommittedTestSchema(db, schema);
     created = true;
-    await db.runMigrations();
+    prisma = createAuthPrisma(testDatabaseConfig(), schema);
   });
 
   afterEach(async () => {
     try {
-      if (created && db?.isInitialized) {
-        if (!/^seed_test_[a-f0-9]{32}$/.test(schema))
-          throw new Error('Invalid test schema');
-        await db.query(`DROP SCHEMA "${schema}" CASCADE`);
-        const remaining: unknown[] = await db.query(
-          'SELECT 1 FROM pg_namespace WHERE nspname = $1',
-          [schema],
-        );
-        expect(remaining).toHaveLength(0);
-      }
+      if (prisma) await prisma.$disconnect();
+      if (created && db) await dropTestSchema(db, schema);
     } finally {
-      if (db?.isInitialized) await db.destroy();
+      if (db) await db.end();
     }
   });
 
   async function adminWithHash() {
-    return db
-      .getRepository(User)
-      .createQueryBuilder('user')
-      .addSelect('user.passwordHash')
-      .where('user.role = :role', { role: 'ADMIN' })
-      .getOneOrFail();
+    const admin = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        passwordHash: true,
+        status: true,
+        assignedWarehouseId: true,
+        updatedAt: true,
+      },
+    });
+    if (!admin) throw new Error('Test admin is missing');
+    return admin;
+  }
+
+  function seedAdmin(values = env) {
+    return createInitialAdmin(prisma, values, schema);
   }
 
   it('creates an ACTIVE admin, a verifiable hash and exactly one SYSTEM audit', async () => {
-    expect(await createInitialAdmin(db.manager, env)).toBe('created');
+    expect(await seedAdmin()).toBe('created');
     const admin = await adminWithHash();
     expect(admin).toMatchObject({
       username: 'admin_test',
@@ -69,7 +76,7 @@ describe('Seed Admin on PostgreSQL', () => {
     expect(
       await verifyPassword(env.SEED_ADMIN_PASSWORD, admin.passwordHash),
     ).toBe(true);
-    const logs = await db.manager.find(UserAuditLog);
+    const logs = await prisma.userAuditLog.findMany();
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({
       userId: admin.id,
@@ -96,17 +103,17 @@ describe('Seed Admin on PostgreSQL', () => {
     ]);
     expect(JSON.stringify(logs)).not.toContain(env.SEED_ADMIN_PASSWORD);
     expect(JSON.stringify(logs)).not.toContain(admin.passwordHash);
-    expect(await db.manager.count(UserPermission)).toBe(0);
+    expect(await prisma.userPermission.count()).toBe(0);
   });
 
   it.each(['ACTIVE', 'INACTIVE'] as const)(
     'skips an existing %s admin without changing password or audit',
     async (status) => {
-      await createInitialAdmin(db.manager, env);
+      await seedAdmin();
       const before = await adminWithHash();
-      await db.manager.update(User, before.id, { status });
+      await prisma.user.update({ where: { id: before.id }, data: { status } });
       expect(
-        await createInitialAdmin(db.manager, {
+        await seedAdmin({
           ...env,
           SEED_ADMIN_PASSWORD: 'mot-mat-khau-moi-khac',
         }),
@@ -115,44 +122,45 @@ describe('Seed Admin on PostgreSQL', () => {
       expect(after.passwordHash).toBe(before.passwordHash);
       expect(after.status).toBe(status);
       expect(after.updatedAt).toEqual(before.updatedAt);
-      expect(await db.manager.count(User)).toBe(1);
-      expect(await db.manager.count(UserAuditLog)).toBe(1);
+      expect(await prisma.user.count()).toBe(1);
+      expect(await prisma.userAuditLog.count()).toBe(1);
     },
   );
 
   it('does not create another admin when the configuration uses a different identity', async () => {
-    await createInitialAdmin(db.manager, env);
+    await seedAdmin();
     expect(
-      await createInitialAdmin(db.manager, {
+      await seedAdmin({
         ...env,
         SEED_ADMIN_USERNAME: 'other_admin',
         SEED_ADMIN_EMAIL: 'other@example.test',
       }),
     ).toBe('admin_exists');
-    expect(await db.manager.count(User)).toBe(1);
-    expect(await db.manager.count(UserAuditLog)).toBe(1);
+    expect(await prisma.user.count()).toBe(1);
+    expect(await prisma.userAuditLog.count()).toBe(1);
   });
 
   it.each(['username', 'email'])(
     'refuses to promote an existing staff account with the seed %s',
     async (field) => {
       const id = randomUUID();
-      await db.manager.insert(User, {
-        id,
-        username: field === 'username' ? 'admin_test' : 'staff_test',
-        email: field === 'email' ? 'admin@example.test' : 'staff@example.test',
-        passwordHash: 'synthetic-staff-hash',
-        role: 'WAREHOUSE_STAFF',
-        assignedWarehouseId: randomUUID(),
+      await prisma.user.create({
+        data: {
+          id,
+          username: field === 'username' ? 'admin_test' : 'staff_test',
+          email:
+            field === 'email' ? 'admin@example.test' : 'staff@example.test',
+          passwordHash: 'synthetic-staff-hash',
+          role: 'WAREHOUSE_STAFF',
+          assignedWarehouseId: randomUUID(),
+        },
       });
-      await expect(createInitialAdmin(db.manager, env)).rejects.toThrow(
-        'tài khoản khác',
-      );
-      expect((await db.manager.findOneByOrFail(User, { id })).role).toBe(
-        'WAREHOUSE_STAFF',
-      );
-      expect(await db.manager.count(User)).toBe(1);
-      expect(await db.manager.count(UserAuditLog)).toBe(0);
+      await expect(seedAdmin()).rejects.toThrow('tài khoản khác');
+      expect(
+        (await prisma.user.findUniqueOrThrow({ where: { id } })).role,
+      ).toBe('WAREHOUSE_STAFF');
+      expect(await prisma.user.count()).toBe(1);
+      expect(await prisma.userAuditLog.count()).toBe(0);
     },
   );
 
@@ -160,17 +168,15 @@ describe('Seed Admin on PostgreSQL', () => {
     await db.query(
       `ALTER TABLE "${schema}".user_audit_logs ADD CONSTRAINT reject_test_audit CHECK (false)`,
     );
-    await expect(createInitialAdmin(db.manager, env)).rejects.toMatchObject({
-      driverError: { code: '23514' },
-    });
-    expect(await db.manager.count(User)).toBe(0);
-    expect(await db.manager.count(UserAuditLog)).toBe(0);
+    await expect(seedAdmin()).rejects.toThrow();
+    expect(await prisma.user.count()).toBe(0);
+    expect(await prisma.userAuditLog.count()).toBe(0);
   });
 
   it('serializes concurrent seeds with different usernames into one admin and audit', async () => {
     const results = await Promise.allSettled([
-      createInitialAdmin(db.manager, env),
-      createInitialAdmin(db.manager, {
+      seedAdmin(),
+      seedAdmin({
         ...env,
         SEED_ADMIN_USERNAME: 'other_admin',
         SEED_ADMIN_EMAIL: 'other@example.test',
@@ -184,7 +190,7 @@ describe('Seed Admin on PostgreSQL', () => {
         )
         .sort(),
     ).toEqual(['admin_exists', 'created']);
-    expect(await db.manager.count(User)).toBe(1);
-    expect(await db.manager.count(UserAuditLog)).toBe(1);
+    expect(await prisma.user.count()).toBe(1);
+    expect(await prisma.userAuditLog.count()).toBe(1);
   });
 });

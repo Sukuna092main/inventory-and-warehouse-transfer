@@ -5,6 +5,7 @@ import { prismaDatabaseUrl } from './src/database/prisma/connection-options';
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
+  migrations: { path: 'prisma/migrations' },
   datasource: {
     url: prismaDatabaseUrl(validateEnvironment(readLocalEnvironment())),
   },

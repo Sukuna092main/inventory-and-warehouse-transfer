@@ -1,6 +1,6 @@
 {
   "openapi": "3.0.3",
-  "info": { "title": "Auth login development API", "version": "0.1.0", "description": "Endpoint đăng nhập hiện đã triển khai; các endpoint Auth khác sẽ bổ sung sau." },
+  "info": { "title": "Auth development API", "version": "0.2.0", "description": "Đăng nhập và lấy tài khoản/quyền hiện hành; Auth local trước khi có Gateway." },
   "servers": [{ "url": "http://localhost:3000", "description": "Auth local trước khi có Gateway" }],
   "paths": {
     "/api/auth/login": {
@@ -33,9 +33,34 @@
           "503": { "$ref": "#/components/responses/ApiError" }
         }
       }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Lấy tài khoản, vai trò, kho và quyền bổ sung hiện hành",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Thông tin hiện hành từ database; Cache-Control: no-store", "content": { "application/json": { "schema": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "username", "email", "role", "assignedWarehouseId", "status", "additionalPermissions"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "username": { "type": "string" },
+              "email": { "type": "string", "format": "email" },
+              "role": { "type": "string", "enum": ["ADMIN", "WAREHOUSE_MANAGER", "WAREHOUSE_STAFF"] },
+              "assignedWarehouseId": { "type": "string", "format": "uuid", "nullable": true },
+              "status": { "type": "string", "enum": ["ACTIVE"] },
+              "additionalPermissions": { "type": "array", "items": { "type": "string", "enum": ["VIEW_OTHER_INVENTORY", "SHIP_TRANSFER", "RECEIVE_TRANSFER", "ADJUST_INVENTORY"] } }
+            }
+          } } } },
+          "401": { "$ref": "#/components/responses/ApiError" },
+          "500": { "$ref": "#/components/responses/ApiError" },
+          "503": { "$ref": "#/components/responses/ApiError" }
+        }
+      }
     }
   },
-  "components": { "responses": { "ApiError": {
+  "components": { "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" } }, "responses": { "ApiError": {
     "description": "Lỗi có code, message và correlationId; 429 có Retry-After: 1",
     "content": { "application/json": { "schema": {
       "type": "object", "required": ["code", "message", "correlationId"],

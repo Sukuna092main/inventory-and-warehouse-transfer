@@ -2,7 +2,7 @@
 
 **Ngày:** 2026-09-22
 
-**Trạng thái:** Hoàn thành. Người dùng đã chạy migration; kiểm tra chỉ đọc ngày 2026-09-22 xác nhận đủ bốn bảng trong `auth_db.public`, bản ghi `CreateAuthTables1790035200000` và trigger `trg_user_audit_append_only` đang bật.
+**Trạng thái:** Tài liệu lịch sử cho migration TypeORM đầu tiên đã chạy ngày 2026-09-22. Auth hiện dùng [baseline Prisma](./prisma-baseline.md); các lệnh và file TypeORM trong tài liệu này đã được thay thế. Bốn bảng, lịch sử `auth_migrations` và trigger audit vẫn được giữ trong database.
 
 ## Phần vừa thực hiện
 
@@ -19,18 +19,9 @@ Ba bảng nghiệp vụ có PRIMARY KEY, UNIQUE, CHECK và FK nội bộ theo [t
 
 Chưa triển khai API hoặc bước tạo tài khoản thật. Việc chuẩn hóa đầu vào, kiểm tra email, kho đang hoạt động, quyền phù hợp role, actor đã xác thực, chọn đúng sáu trường trong bản chụp audit và cập nhật `updated_at` cùng transaction sẽ được thực hiện ở bước nghiệp vụ. Kiểu TypeScript không thay thế kiểm tra dữ liệu lúc chạy. `passwordHash` có `select: false` để tránh lấy trong truy vấn thông thường; API sau này vẫn phải dùng DTO chỉ chứa trường được phép trả về.
 
-## Bạn thực hiện thủ công
+## Cách đã chạy trước đây
 
-Giữ PostgreSQL đang chạy và dùng `.env` đã cấu hình trong Auth. Không cần cài thêm dependency. Mở terminal tại `services/auth-service`; nếu đang chạy `pnpm start:dev` trong terminal đó, dừng bằng Ctrl+C trước khi chạy lệnh dưới đây.
-
-```powershell
-pnpm migration:run
-pnpm migration:show
-```
-
-Mỗi lệnh tự build trước khi dùng TypeORM CLI. `migration:run` tạo bảng bằng migration `CreateAuthTables1790035200000`, trong transaction. Khi thành công, `migration:show` đánh dấu `[X]` cho migration đó. Chạy lại `migration:run` sẽ bỏ qua migration đã ghi nhận, không tạo bảng trùng hoặc reset dữ liệu.
-
-Lưu ý: bản TypeORM đang dùng có thể tạo bảng kỹ thuật `auth_migrations` ngay cả khi chỉ chạy `migration:show`; lệnh này không tạo ba bảng nghiệp vụ.
+Người dùng đã chạy migration `CreateAuthTables1790035200000` bằng TypeORM CLI và xác nhận bảng kỹ thuật `auth_migrations` có bản ghi tương ứng. Những lệnh CLI đó đã được gỡ khỏi `package.json`. Trên database hiện có, Prisma baseline `0_auth_baseline` đã được đánh dấu applied; không chạy lại SQL tạo bảng. Với database Auth mới trong tương lai, dùng Prisma Migrate theo [hướng dẫn baseline](./prisma-baseline.md).
 
 Trong pgAdmin, chọn `auth_db` → Schemas → public → Tables → Refresh. Bạn sẽ thấy bốn bảng trên. Có thể mở Query Tool của `auth_db` và chạy:
 
@@ -45,16 +36,15 @@ ORDER BY table_name;
 SELECT id, name FROM public.auth_migrations ORDER BY id;
 ```
 
-Sau khi kiểm tra xong, chạy lại `pnpm start:dev` nếu đã dừng service. Bước này chưa tạo tài khoản Admin hoặc chức năng đăng nhập.
+Phần hướng dẫn này ghi lại kết quả ban đầu. Auth hiện đã có Admin và API đăng nhập; xem [hướng dẫn seed](./seed-admin.md) và [API đăng nhập](./auth-login.md).
 
-## File cần đọc
+## File hiện hành cần đọc
 
-- `services/auth-service/src/users/entities/`: ba entity và kiểu dữ liệu Auth.
-- `services/auth-service/src/database/database-options.ts`: cấu hình database dùng chung cho NestJS và CLI.
-- `services/auth-service/src/database/data-source.ts`: nạp `.env` cho CLI.
-- `services/auth-service/src/database/migrations/1790035200000-CreateAuthTables.ts`: SQL tạo bảng, index, ràng buộc và trigger.
+- `services/auth-service/prisma/schema.prisma`: model Auth cho Prisma Client.
+- `services/auth-service/prisma/migrations/0_auth_baseline/migration.sql`: SQL tạo bảng, index, ràng buộc và trigger trên database mới.
+- `services/auth-service/prisma.config.ts`: cấu hình CLI Prisma Migrate và kết nối local.
 
-Migration đã chạy phải được giữ nguyên; các thay đổi sau đó cần migration mới. Có lệnh `pnpm migration:revert` để quay lại migration trước, nhưng `down` của migration đầu tiên **xóa ba bảng và dữ liệu trong đó**. Không dùng lệnh này trong quy trình chạy thường ngày hoặc trên dữ liệu cần giữ.
+Lịch sử migration TypeORM vẫn còn trong bảng `auth_migrations`; file TypeScript cũ đã được gỡ sau khi baseline Prisma được kiểm chứng. Các thay đổi schema sau này cần migration Prisma mới. Không dùng reset để xử lý database có dữ liệu.
 
 ## Kết quả kiểm tra
 

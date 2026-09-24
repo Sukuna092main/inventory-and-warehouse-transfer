@@ -1,7 +1,7 @@
 # Kết nối Auth Service với PostgreSQL local
 
 **Ngày:** 2026-09-22  
-**Phạm vi:** kết nối database và kiểm tra cấu hình. Entity/migration đã bổ sung ở bước sau; xem [hướng dẫn tạo bảng](./auth-database-migration.md). Khi chạy HTTP server hiện tại cần thêm JWT_SECRET theo [hướng dẫn đăng nhập](./auth-login.md).
+**Phạm vi:** ghi lại bước kết nối database ban đầu. Auth hiện dùng Prisma; xem [bước chuyển ORM](./prisma-transition.md). Khi chạy HTTP server cần thêm JWT_SECRET theo [hướng dẫn đăng nhập](./auth-login.md).
 
 ## Cấu hình
 
@@ -32,15 +32,16 @@ Sau đó mở terminal tại `services/auth-service`:
 pnpm start:dev
 ```
 
-Chỉ chạy một phiên Auth trên cổng 3000. Nếu đang có phiên watch thì lưu mã nguồn sẽ kích hoạt khởi động lại. Khi có log `Nest application successfully started`, mở `http://localhost:3000` để kiểm tra phản hồi `Hello World!`. Service chờ kết nối database thành công trước khi nhận HTTP request.
+Chỉ chạy một phiên Auth trên cổng 3000. Nếu đang có phiên watch thì lưu mã nguồn sẽ kích hoạt khởi động lại. Khi có log `Nest application successfully started`, mở `http://localhost:3000` để kiểm tra phản hồi `Hello World!`. Prisma mở kết nối khi có truy vấn; dùng `pnpm prisma:check` để kiểm tra database riêng.
 
-Nếu không kết nối được, kiểm tra PostgreSQL, cổng 5433 và mật khẩu `auth_user` trong `.env`; không gửi mật khẩu vào hội thoại. Kết nối có timeout 5 giây và tối đa 3 lần thử khi khởi động.
+Nếu không kết nối được, kiểm tra PostgreSQL, cổng 5433 và mật khẩu `auth_user` trong `.env`; không gửi mật khẩu vào hội thoại. Adapter PostgreSQL có timeout kết nối 5 giây.
 
 ## Cách hoạt động và kiểm tra
 
 - `src/config/environment.ts`: kiểm tra và chuyển kiểu cấu hình.
-- `src/app.module.ts`: nạp cấu hình và tạo kết nối TypeORM.
+- `src/app.module.ts`: nạp cấu hình cho ứng dụng NestJS và AuthModule.
+- `src/database/prisma/auth-prisma.service.ts`: tạo Prisma Client cho Auth và đóng kết nối khi ứng dụng dừng.
 - `src/main.ts`: dùng cổng đã kiểm tra và đóng kết nối khi ứng dụng dừng qua shutdown hook.
-- `synchronize`, `migrationsRun`, `dropSchema`, `installExtensions` đều là `false`; đã đăng ký ba entity Auth. Chạy service không tự tạo bảng hoặc chạy migration.
+- Chạy service không tự tạo bảng hoặc chạy migration; cấu trúc được quản lý bởi Prisma Migrate.
 
-Đã kiểm tra ngày 2026-09-22: build, unit test (1 ca), e2e (1 ca GET `/` trả HTTP 200 và `Hello World!` với database thật), lint và định dạng mã nguồn đạt. Kiểm tra qua Nest application context và chính TypeORM DataSource của ứng dụng trả về `auth_db` / `auth_user`. Trước khi người dùng chạy migration, số bảng trong schema `public` là 0. Kết quả kiểm tra schema và các lệnh migration nằm trong [hướng dẫn tạo bảng](./auth-database-migration.md).
+Kết quả lịch sử ngày 2026-09-22: build, unit test, e2e và lint đạt; lúc đó TypeORM DataSource trả về `auth_db` / `auth_user`. Sau khi chuyển ORM, `pnpm prisma:check` đã xác nhận cùng database và tài khoản kết nối. Lịch sử tạo bảng ban đầu ở [tài liệu cũ](./auth-database-migration.md); migration hiện hành ở [baseline Prisma](./prisma-baseline.md).

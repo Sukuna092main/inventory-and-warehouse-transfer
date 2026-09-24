@@ -2,7 +2,7 @@
 
 **Ngày:** 2026-09-23
 
-**Trạng thái:** Bước kết nối và truy vấn đăng nhập bằng Prisma DONE; xem [kết quả kết nối](./prisma-connection.md) và [API đăng nhập](./auth-login.md). Chuyển đổi tổng thể vẫn IN_PROGRESS vì seed, baseline migration và test setup còn dùng TypeORM.
+**Trạng thái:** DONE. Kết nối, API đăng nhập, seed Admin, [baseline migration](./prisma-baseline.md) và test setup đã chuyển sang Prisma/baseline SQL. Source, manifest và lockfile không còn TypeORM; build, lint và các bộ test đạt sau khi gỡ dependency.
 
 ## Lựa chọn và bước hiện tại
 
@@ -17,18 +17,18 @@ pnpm add -D --save-exact --strict-peer-dependencies prisma@7
 
 `@prisma/client` cung cấp phần runtime để truy vấn; `@prisma/adapter-pg` nối Prisma với driver PostgreSQL `pg` đã có; `prisma` là CLI dùng để kiểm tra schema, sinh client và quản lý migration. `--save-exact` lưu phiên bản cụ thể được chọn vào manifest và lockfile. Người dùng đã cài lại theo lockfile và kiểm tra kết nối thành công.
 
-Chưa chạy lệnh init, db push, migrate dev hoặc reset lên `auth_db`. Chưa gỡ TypeORM vì code hiện tại còn dùng nó.
+Không chạy lệnh init, db push, migrate dev hoặc reset lên `auth_db`. Mã chạy và test đã bỏ TypeORM; hai dependency cũ đã được người dùng gỡ thủ công.
 
 ## Phạm vi chuyển đổi từng bước
 
 | Phần hiện có | Cách chuyển dự kiến |
 |---|---|
 | Ba entity users, user_permissions, user_audit_logs | Khai báo model trong `schema.prisma`, ánh xạ đúng tên cột/bảng, UUID, timestamptz, JSON, nullability, FK và index đang có |
-| TypeOrmModule, DataSource | PrismaModule/PrismaService dùng PostgreSQL adapter và cấu hình local |
+| TypeOrmModule, DataSource | Server dùng AuthPrismaService với PostgreSQL adapter; mã DataSource TypeORM cũ đã được xóa |
 | Truy vấn trong auth.service.ts | Prisma Client với `select` rõ các trường; response đăng nhập không đổi |
 | create-initial-admin.ts | Prisma transaction, giữ khóa chống seed đồng thời, tạo user và audit nguyên tử |
 | Migration TypeScript hiện tại | Baseline SQL lưu cấu trúc hiện có, gồm CHECK, index DESC, function và trigger audit |
-| Các test đang dùng TypeORM | Chuyển setup và truy vấn sang Prisma/pg, giữ kiểm tra dữ liệu, rollback, seed đồng thời, mật khẩu và JWT |
+| Các test từng dùng TypeORM | Setup dùng baseline SQL và `pg`; truy vấn ứng dụng dùng Prisma, giữ kiểm tra rollback, seed đồng thời, mật khẩu và JWT |
 | Script migration, seed và tài liệu | Cập nhật lệnh sau khi có cấu hình đã kiểm tra; giải thích vai trò từng file |
 
 Controller/DTO đăng nhập, hợp đồng HTTP, hàm băm scrypt và cấu hình JWT giữ nguyên hành vi. Không mở rộng sang service khác trong lần chuyển Auth.
@@ -46,11 +46,19 @@ Tham khảo quy trình [baseline database đã có dữ liệu](https://www.pris
 ## Điều kiện hoàn thành
 
 - [x] Dependency Prisma đầy đủ; schema validate, generate client, build và truy vấn chỉ đọc trên `auth_db` đều đạt với Prisma 7.10.0.
-- [ ] Schema và baseline SQL khớp database hiện có, giữ constraint và trigger.
+- [x] Schema và baseline SQL khớp database hiện có; đã so sánh cột/default, constraint, index, sequence, function và trigger trong schema test riêng.
 - [x] Login dùng Prisma; 22 ca HTTP trên PostgreSQL thật xác nhận hợp đồng, lỗi an toàn và JWT không chứa password hash.
-- [ ] Seed chạy lại không đổi Admin; seed mới/audit lỗi/chạy đồng thời được kiểm tra.
-- [ ] Test trên database/schema riêng đạt, không còn import TypeORM trong mã chạy và test hiện hành.
-- [ ] Người dùng ghi nhận baseline cho database local theo hướng dẫn đã kiểm tra.
-- [ ] Gỡ dependency TypeORM và cập nhật tài liệu, giải thích vai trò từng file.
+- [x] Seed dùng Prisma; 8 ca PostgreSQL riêng xác nhận tạo mới, chạy lại không đổi Admin, audit lỗi thì rollback và chạy đồng thời chỉ tạo một Admin.
+- [x] Test trên database/schema riêng đạt: 26 unit, 68 database và 1 e2e; không còn import TypeORM trong mã chạy và test hiện hành.
+- [x] Người dùng ghi nhận baseline cho database local; truy vấn chỉ đọc xác nhận `0_auth_baseline` đã applied.
+- [x] Người dùng đã gỡ `@nestjs/typeorm` và `typeorm` bằng pnpm; manifest/lockfile không còn hai package. Sau đó `pnpm build`, `pnpm lint`, 26 unit, 68 database và 1 e2e đều đạt.
+
+Lệnh người dùng đã chạy tại `services/auth-service`:
+
+```powershell
+pnpm remove @nestjs/typeorm typeorm --strict-peer-dependencies
+```
+
+Lệnh này chỉ gỡ hai dependency cũ và cập nhật `package.json`/`pnpm-lock.yaml`; không cần chạy lại.
 
 File này theo dõi riêng quá trình đổi ORM; `plan.md` vẫn là kế hoạch và tiến độ toàn dự án.

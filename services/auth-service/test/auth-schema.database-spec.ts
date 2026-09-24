@@ -1,20 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { DataSource, MigrationExecutor } from 'typeorm';
-import type { QueryRunner } from 'typeorm';
-import configuredDataSource from '../src/database/data-source';
-import { User } from '../src/users/entities/user.entity';
-import { UserPermission } from '../src/users/entities/user-permission.entity';
-import { UserAuditLog } from '../src/users/entities/user-audit-log.entity';
-import type { UserAuditSnapshot } from '../src/users/entities/user.types';
+import {
+  applyAuthBaseline,
+  newTestSchema,
+  openTestPostgres,
+} from './postgres-test';
+import type { TestPgClient } from './postgres-test';
 
-describe('Auth schema on PostgreSQL', () => {
-  // All DDL and fixtures live in one uncommitted transaction, in a unique schema.
-  // Even an interrupted process cannot leave test tables in public.
-  const schema = `auth_test_${randomUUID().replaceAll('-', '')}`;
+describe('Auth baseline schema on PostgreSQL', () => {
+  // The outer transaction rolls back DDL as well as test data.
+  const schema = newTestSchema('auth');
   const adminId = randomUUID();
   const staffId = randomUUID();
   const warehouseId = randomUUID();
-  const snapshot: UserAuditSnapshot = {
+  const snapshot = {
     username: 'admin_test',
     email: 'admin@example.test',
     role: 'ADMIN',
@@ -22,114 +20,151 @@ describe('Auth schema on PostgreSQL', () => {
     status: 'ACTIVE',
     additional_permissions: [],
   };
-  let db: DataSource;
-  let runner: QueryRunner;
-  let executor: MigrationExecutor;
+  let db: TestPgClient;
+
+  const users = `"${schema}".users`;
+  const permissions = `"${schema}".user_permissions`;
+  const audits = `"${schema}".user_audit_logs`;
+
+  async function expectDbError(
+    sql: string,
+    params: readonly unknown[],
+    code: string,
+    constraint?: string,
+  ) {
+    await db.query('SAVEPOINT expected_error');
+    let error: unknown;
+    try {
+      await db.query(sql, params);
+    } catch (caught) {
+      error = caught;
+    } finally {
+      await db.query('ROLLBACK TO SAVEPOINT expected_error');
+      await db.query('RELEASE SAVEPOINT expected_error');
+    }
+    expect(error).toMatchObject({
+      code,
+      ...(constraint ? { constraint } : {}),
+    });
+  }
+
+  async function insertAudit(
+    action = 'USER_CREATED',
+    actorType = 'SYSTEM',
+    actorId: string | null = null,
+    beforeData: string | null = null,
+  ) {
+    await db.query(
+      `INSERT INTO ${audits} (id, user_id, actor_type, actor_id, action, before_data, after_data, correlation_id)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)`,
+      [
+        randomUUID(),
+        adminId,
+        actorType,
+        actorId,
+        action,
+        beforeData,
+        JSON.stringify(snapshot),
+        'schema-test',
+      ],
+    );
+  }
 
   beforeAll(async () => {
-    const options = configuredDataSource.options;
-    if (options.type !== 'postgres') throw new Error('PostgreSQL required');
-    db = new DataSource({ ...options, schema });
-    await db.initialize();
-    runner = db.createQueryRunner();
-    await runner.connect();
-    await runner.startTransaction();
-    await runner.query(`CREATE SCHEMA "${schema}"`);
-    executor = new MigrationExecutor(db, runner);
-    expect(await executor.executePendingMigrations()).toHaveLength(1);
+    db = await openTestPostgres();
+    await db.query('BEGIN');
+    await db.query(`CREATE SCHEMA "${schema}"`);
+    await applyAuthBaseline(db, schema);
   });
 
   beforeEach(async () => {
-    await runner.startTransaction(); // Savepoint: every case gets fresh fixtures.
-    await runner.manager.insert(User, [
-      {
-        id: adminId,
-        username: 'admin_test',
-        email: 'admin@example.test',
-        passwordHash: 'synthetic-test-hash',
-        role: 'ADMIN',
-      },
-      {
-        id: staffId,
-        username: 'staff_test',
-        email: 'staff@example.test',
-        passwordHash: 'synthetic-test-hash',
-        role: 'WAREHOUSE_STAFF',
-        assignedWarehouseId: warehouseId,
-      },
-    ]);
+    await db.query('SAVEPOINT case_data');
+    await db.query(
+      `INSERT INTO ${users} (id, username, email, password_hash, role)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        adminId,
+        'admin_test',
+        'admin@example.test',
+        'synthetic-test-hash',
+        'ADMIN',
+      ],
+    );
+    await db.query(
+      `INSERT INTO ${users} (id, username, email, password_hash, role, assigned_warehouse_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        staffId,
+        'staff_test',
+        'staff@example.test',
+        'synthetic-test-hash',
+        'WAREHOUSE_STAFF',
+        warehouseId,
+      ],
+    );
   });
 
   afterEach(async () => {
-    if (runner?.isTransactionActive) await runner.rollbackTransaction();
+    await db.query('ROLLBACK TO SAVEPOINT case_data');
+    await db.query('RELEASE SAVEPOINT case_data');
   });
 
   afterAll(async () => {
     try {
-      if (runner && !runner.isReleased) {
-        while (runner.isTransactionActive) await runner.rollbackTransaction();
-        await runner.release();
-      }
-      if (db?.isInitialized) {
-        const remaining: unknown[] = await db.query(
+      if (db) {
+        await db.query('ROLLBACK');
+        const remaining = await db.query(
           'SELECT 1 FROM pg_namespace WHERE nspname = $1',
           [schema],
         );
-        expect(remaining).toHaveLength(0);
+        expect(remaining.rowCount).toBe(0);
       }
     } finally {
-      if (db?.isInitialized) await db.destroy();
+      if (db) await db.end();
     }
   });
 
-  const newUser = () => ({
-    id: randomUUID(),
-    username: 'another_user',
-    email: 'another@example.test',
-    passwordHash: 'synthetic-test-hash',
-    role: 'ADMIN' as const,
-  });
-
-  const creationAudit = () => ({
-    id: randomUUID(),
-    userId: adminId,
-    actorType: 'SYSTEM' as const,
-    actorId: null,
-    action: 'USER_CREATED' as const,
-    beforeData: null,
-    afterData: snapshot,
-    correlationId: 'schema-test',
-  });
-
-  it('maps users, defaults and explicitly selected password hashes', async () => {
-    const users = runner.manager.getRepository(User);
-    const admin = await users.findOneByOrFail({ id: adminId });
-    expect(admin).toMatchObject({
-      role: 'ADMIN',
+  it('creates users with defaults and explicit password hashes', async () => {
+    const result = await db.query<{
+      status: string;
+      assigned_warehouse_id: string | null;
+      password_hash: string;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `SELECT status, assigned_warehouse_id, password_hash, created_at, updated_at FROM ${users} WHERE id=$1`,
+      [adminId],
+    );
+    expect(result.rows[0]).toMatchObject({
       status: 'ACTIVE',
-      assignedWarehouseId: null,
+      assigned_warehouse_id: null,
+      password_hash: 'synthetic-test-hash',
     });
-    expect(admin.createdAt).toBeInstanceOf(Date);
-    expect(admin.updatedAt).toBeInstanceOf(Date);
-    expect(admin.passwordHash).toBeUndefined();
-    const forLogin = await users
-      .createQueryBuilder('user')
-      .addSelect('user.passwordHash')
-      .where('user.id = :id', { id: adminId })
-      .getOneOrFail();
-    expect(forLogin.passwordHash).toBe('synthetic-test-hash');
+    expect(result.rows[0].created_at).toBeInstanceOf(Date);
+    expect(result.rows[0].updated_at).toBeInstanceOf(Date);
   });
 
   it.each([
-    ['username', { username: 'admin_test' }, 'uq_users_username'],
-    ['email', { email: 'admin@example.test' }, 'uq_users_email'],
+    ['username', 'admin_test', 'uq_users_username'],
+    ['email', 'admin@example.test', 'uq_users_email'],
   ])(
     'keeps %s unique even after disabling the existing user',
-    async (_field, duplicate, constraint) => {
-      await runner.manager.update(User, adminId, { status: 'INACTIVE' });
-      await expect(
-        runner.manager.insert(User, { ...newUser(), ...duplicate }),
-      ).rejects.toMatchObject({ driverError: { code: '23505', constraint } });
+    async (field, value, constraint) => {
+      await db.query(`UPDATE ${users} SET status='INACTIVE' WHERE id=$1`, [
+        adminId,
+      ]);
+      await expectDbError(
+        `INSERT INTO ${users} (id, username, email, password_hash, role) VALUES ($1, $2, $3, $4, $5)`,
+        [
+          randomUUID(),
+          field === 'username' ? value : 'another_user',
+          field === 'email' ? value : 'another@example.test',
+          'synthetic-test-hash',
+          'ADMIN',
+        ],
+        '23505',
+        constraint,
+      );
     },
   );
 
@@ -147,48 +182,53 @@ describe('Auth schema on PostgreSQL', () => {
   ])(
     'rejects invalid %s (%s) at the database boundary',
     async (column, value, constraint) => {
-      await expect(
-        runner.query(
-          `UPDATE "${schema}".users SET ${column} = $1 WHERE id = $2`,
-          [value, adminId],
-        ),
-      ).rejects.toMatchObject({ driverError: { code: '23514', constraint } });
+      await expectDbError(
+        `UPDATE ${users} SET ${column}=$1 WHERE id=$2`,
+        [value, adminId],
+        '23514',
+        constraint,
+      );
     },
   );
 
   it.each(['WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF'])(
     'requires a warehouse for %s',
     async (role) => {
-      await expect(
-        runner.query(`UPDATE "${schema}".users SET role = $1 WHERE id = $2`, [
-          role,
-          adminId,
-        ]),
-      ).rejects.toMatchObject({
-        driverError: { code: '23514', constraint: 'ck_users_warehouse' },
-      });
+      await expectDbError(
+        `UPDATE ${users} SET role=$1 WHERE id=$2`,
+        [role, adminId],
+        '23514',
+        'ck_users_warehouse',
+      );
     },
   );
 
-  it('maps permission references and rejects a duplicate grant', async () => {
-    const permission = {
-      userId: staffId,
-      permission: 'SHIP_TRANSFER' as const,
-      grantedBy: adminId,
-    };
-    await runner.manager.insert(UserPermission, permission);
-    const grant = await runner.manager.findOneOrFail(UserPermission, {
-      where: { userId: staffId, permission: 'SHIP_TRANSFER' },
-      relations: { user: true, granter: true },
+  it('stores permission references and rejects a duplicate grant', async () => {
+    await db.query(
+      `INSERT INTO ${permissions} (user_id, permission, granted_by) VALUES ($1, $2, $3)`,
+      [staffId, 'SHIP_TRANSFER', adminId],
+    );
+    const grant = await db.query<{
+      recipient: string;
+      granter: string;
+      granted_at: Date;
+    }>(
+      `SELECT recipient.id AS recipient, granter.id AS granter, p.granted_at
+       FROM ${permissions} p JOIN ${users} recipient ON recipient.id=p.user_id
+       JOIN ${users} granter ON granter.id=p.granted_by WHERE p.user_id=$1`,
+      [staffId],
+    );
+    expect(grant.rows[0]).toMatchObject({
+      recipient: staffId,
+      granter: adminId,
     });
-    expect(grant.user.id).toBe(staffId);
-    expect(grant.granter.id).toBe(adminId);
-    expect(grant.grantedAt).toBeInstanceOf(Date);
-    await expect(
-      runner.manager.insert(UserPermission, permission),
-    ).rejects.toMatchObject({
-      driverError: { code: '23505', constraint: 'pk_user_permissions' },
-    });
+    expect(grant.rows[0].granted_at).toBeInstanceOf(Date);
+    await expectDbError(
+      `INSERT INTO ${permissions} (user_id, permission, granted_by) VALUES ($1, $2, $3)`,
+      [staffId, 'SHIP_TRANSFER', adminId],
+      '23505',
+      'pk_user_permissions',
+    );
   });
 
   it.each([
@@ -196,41 +236,45 @@ describe('Auth schema on PostgreSQL', () => {
     ['missing recipient', randomUUID(), 'SHIP_TRANSFER', adminId, '23503'],
     ['missing granter', staffId, 'SHIP_TRANSFER', randomUUID(), '23503'],
   ])('rejects %s', async (_label, userId, permission, granter, code) => {
-    await expect(
-      runner.query(
-        `INSERT INTO "${schema}".user_permissions (user_id, permission, granted_by) VALUES ($1, $2, $3)`,
-        [userId, permission, granter],
-      ),
-    ).rejects.toMatchObject({ driverError: { code } });
+    await expectDbError(
+      `INSERT INTO ${permissions} (user_id, permission, granted_by) VALUES ($1, $2, $3)`,
+      [userId, permission, granter],
+      code,
+    );
   });
 
-  it('maps SYSTEM creation and USER update audit snapshots and references', async () => {
-    const creation = creationAudit();
-    await runner.manager.insert(UserAuditLog, creation);
-    const saved = await runner.manager.findOneByOrFail(UserAuditLog, {
-      id: creation.id,
+  it('stores SYSTEM creation and USER update audit snapshots', async () => {
+    await insertAudit();
+    await insertAudit(
+      'USER_UPDATED',
+      'USER',
+      adminId,
+      JSON.stringify(snapshot),
+    );
+    const history = await db.query<{
+      actor_type: string;
+      actor_id: string | null;
+      before_data: unknown;
+      after_data: unknown;
+      created_at: Date;
+    }>(
+      `SELECT actor_type, actor_id, before_data, after_data, created_at FROM ${audits} ORDER BY created_at`,
+      [],
+    );
+    expect(history.rows).toHaveLength(2);
+    expect(history.rows[0]).toMatchObject({
+      actor_type: 'SYSTEM',
+      actor_id: null,
+      before_data: null,
+      after_data: snapshot,
     });
-    expect(saved).toMatchObject({
-      actorType: 'SYSTEM',
-      actorId: null,
-      beforeData: null,
-      afterData: snapshot,
+    expect(history.rows[1]).toMatchObject({
+      actor_type: 'USER',
+      actor_id: adminId,
+      before_data: snapshot,
+      after_data: snapshot,
     });
-    expect(saved.createdAt).toBeInstanceOf(Date);
-    const update = {
-      ...creationAudit(),
-      actorType: 'USER' as const,
-      actorId: adminId,
-      action: 'USER_UPDATED' as const,
-      beforeData: snapshot,
-    };
-    await runner.manager.insert(UserAuditLog, update);
-    const history = await runner.manager.findOneOrFail(UserAuditLog, {
-      where: { id: update.id },
-      relations: { user: true, actor: true },
-    });
-    expect(history.user.id).toBe(adminId);
-    expect(history.actor?.id).toBe(adminId);
+    expect(history.rows[0].created_at).toBeInstanceOf(Date);
   });
 
   it.each([
@@ -367,77 +411,60 @@ describe('Auth schema on PostgreSQL', () => {
       correlation,
       code,
     ) => {
-      await expect(
-        runner.query(
-          `INSERT INTO "${schema}".user_audit_logs
-      (id, user_id, actor_type, actor_id, action, before_data, after_data, correlation_id)
-      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)`,
-          [
-            randomUUID(),
-            adminId,
-            actorType,
-            actorId,
-            action,
-            before,
-            after,
-            correlation,
-          ],
-        ),
-      ).rejects.toMatchObject({ driverError: { code } });
+      await expectDbError(
+        `INSERT INTO ${audits} (id, user_id, actor_type, actor_id, action, before_data, after_data, correlation_id)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)`,
+        [
+          randomUUID(),
+          adminId,
+          actorType,
+          actorId,
+          action,
+          before,
+          after,
+          correlation,
+        ],
+        code,
+      );
     },
   );
 
   it.each(['UPDATE', 'DELETE', 'TRUNCATE'])(
     'blocks %s of audit history',
     async (operation) => {
-      await runner.manager.insert(UserAuditLog, creationAudit());
+      await insertAudit();
       const sql =
         operation === 'UPDATE'
-          ? `UPDATE "${schema}".user_audit_logs SET correlation_id = 'changed'`
+          ? `UPDATE ${audits} SET correlation_id='changed'`
           : operation === 'DELETE'
-            ? `DELETE FROM "${schema}".user_audit_logs`
-            : `TRUNCATE "${schema}".user_audit_logs`;
-      await expect(runner.query(sql)).rejects.toMatchObject({
-        driverError: { code: '55000' },
-      });
+            ? `DELETE FROM ${audits}`
+            : `TRUNCATE ${audits}`;
+      await expectDbError(sql, [], '55000');
     },
   );
 
   it('preserves users referenced by audit history', async () => {
-    await runner.manager.insert(UserAuditLog, creationAudit());
-    await expect(runner.manager.delete(User, adminId)).rejects.toMatchObject({
-      driverError: { code: '23503' },
-    });
+    await insertAudit();
+    await expectDbError(`DELETE FROM ${users} WHERE id=$1`, [adminId], '23503');
   });
 
   it('rolls back the user write when the audit insert fails', async () => {
-    await runner.startTransaction();
-    try {
-      await runner.manager.update(User, adminId, { status: 'INACTIVE' });
-      await expect(
-        runner.manager.insert(UserAuditLog, {
-          ...creationAudit(),
-          correlationId: '',
-        }),
-      ).rejects.toMatchObject({ driverError: { code: '23514' } });
-    } finally {
-      await runner.rollbackTransaction();
-    }
-    expect(
-      (await runner.manager.findOneByOrFail(User, { id: adminId })).status,
-    ).toBe('ACTIVE');
-  });
-
-  it('records a migration once and supports down/up in the isolated schema', async () => {
-    expect(await executor.executePendingMigrations()).toHaveLength(0);
-    await executor.undoLastMigration();
-    const remaining: unknown[] = await runner.query(
-      'SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_name <> $2',
-      [schema, 'auth_migrations'],
+    await db.query('SAVEPOINT user_change');
+    await db.query(`UPDATE ${users} SET status='INACTIVE' WHERE id=$1`, [
+      adminId,
+    ]);
+    await expectDbError(
+      `INSERT INTO ${audits} (id, user_id, actor_type, action, after_data, correlation_id)
+       VALUES ($1, $2, 'SYSTEM', 'USER_CREATED', '{}'::jsonb, '')`,
+      [randomUUID(), adminId],
+      '23514',
     );
-    expect(remaining).toHaveLength(0);
-    expect(await executor.executePendingMigrations()).toHaveLength(1);
-    expect(await executor.executePendingMigrations()).toHaveLength(0);
-    expect(await runner.manager.count(User)).toBe(0);
+    await db.query('ROLLBACK TO SAVEPOINT user_change');
+    await db.query('RELEASE SAVEPOINT user_change');
+    const result = await db.query<{ status: string }>(
+      `SELECT status FROM ${users} WHERE id=$1`,
+      [adminId],
+    );
+    expect(result.rows[0].status).toBe('ACTIVE');
   });
 });

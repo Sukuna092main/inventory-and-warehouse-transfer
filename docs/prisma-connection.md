@@ -2,7 +2,7 @@
 
 **Ngày:** 2026-09-23
 
-**Trạng thái:** DONE — người dùng đã validate schema, generate client, build và đọc database Auth bằng Prisma thành công. API và seed vẫn dùng TypeORM ở bước này.
+**Trạng thái:** DONE — người dùng đã validate schema, generate client, build và đọc database Auth bằng Prisma thành công. Sau bước kết nối này, API và seed đã được chuyển sang Prisma.
 
 ## Phần đã đối chiếu
 

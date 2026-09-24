@@ -2,7 +2,7 @@
 
 **Ngày:** 2026-09-23
 
-**Trạng thái:** API đăng nhập đã chuyển truy vấn sang Prisma và kiểm thử; kiểm tra thủ công bằng Admin đã seed tùy theo cấu hình JWT local. Chưa làm `/api/auth/me`, guard cho API cần xác thực hoặc giao diện đăng nhập.
+**Trạng thái:** API đăng nhập đã chuyển truy vấn sang Prisma và kiểm thử; kiểm tra thủ công bằng Admin đã seed tùy theo cấu hình JWT local. `/api/auth/me` và guard xác thực đầu tiên đã triển khai, xem [hướng dẫn riêng](./auth-me.md). Giao diện đăng nhập chưa làm.
 
 ## 1. Chuẩn bị khóa ký JWT
 
@@ -103,7 +103,7 @@ Các đường dẫn dưới đây tính từ `services/auth-service`.
 | `.env.example` | Thêm tên biến JWT_SECRET để biết cấu hình cần bổ sung; không sinh khóa thật |
 | `src/auth/jwt.config.spec.ts` | Kiểm tra chữ ký, thời hạn, issuer/audience và thuật toán JWT |
 | `src/auth/auth.service.spec.ts` | Kiểm tra giới hạn số lượt đang xử lý và việc giải phóng lượt sau khi lỗi |
-| `test/auth-login.database-spec.ts` | Gọi HTTP thật vào Nest với Prisma kết nối tới schema PostgreSQL riêng; TypeORM hiện chỉ chuẩn bị và dọn dữ liệu thử |
+| `test/auth-login.database-spec.ts` | Gọi HTTP thật vào Nest với Prisma kết nối tới schema PostgreSQL riêng; helper PostgreSQL dựng và dọn schema bằng baseline SQL |
 | `jest.config.ts`, `test/jest-database.json`, `test/jest-e2e.json` | Giúp Jest tìm các file TypeScript mà Prisma Client sinh ra dù import có đuôi `.js` |
 | `test/app.e2e-spec.ts` | Giữ kiểm tra GET /, thêm khóa ký ngẫu nhiên chỉ dùng trong test và dùng cùng cấu hình HTTP |
 | `src/database/seeds/seed-admin-config.spec.ts` | Sửa dữ liệu ca “mật khẩu quá ngắn” cho khớp mức tối thiểu 8 ký tự bạn đã chọn |
@@ -112,6 +112,6 @@ Luồng: request → DTO/validation → controller → service → Prisma đọc
 
 ## 5. Kiểm thử
 
-Sau khi chuyển truy vấn sang Prisma, đã đạt 26 unit test, 69 ca database (gồm 22 ca HTTP đăng nhập) và 1 e2e GET `/`. Các ca HTTP đăng nhập chạy trong schema `login_test_<UUID>` có dữ liệu và khóa JWT thử riêng; dọn schema khi kết thúc, không thay đổi Admin đã seed trong `public`. Kiểm tra kiểu, Nest build và lint đạt. Lệnh `pnpm build` bị đứng ở bước gọi Prisma CLI trong môi trường trợ lý nên phần generate+build qua lệnh đó chưa được xác nhận lại; người dùng đã generate client ở bước kết nối trước đó.
+Sau khi chuyển toàn bộ test setup sang baseline Prisma, các ca HTTP chạy trong schema `login_test_<UUID>` có dữ liệu và khóa JWT thử riêng; dọn schema khi kết thúc, không thay đổi Admin đã seed trong `public`. `pnpm build` đã đạt trong lần kiểm tra gần nhất. Kết quả kiểm thử cập nhật cho `/me` được ghi tại [auth-me.md](./auth-me.md).
 
-Chạy lại bằng `pnpm test --runInBand`, `pnpm test:database` và `pnpm test:e2e --runInBand`. Tests tự cấp khóa thử nên không thay `.env` thật. Phần đăng nhập đầy đủ trên web/Android và kiểm tra quyền hiện hành chưa được đánh dấu hoàn thành.
+Chạy lại bằng `pnpm test --runInBand`, `pnpm test:database` và `pnpm test:e2e --runInBand`. Tests tự cấp khóa thử nên không thay `.env` thật. FEAT-01 chưa hoàn thành vì web/Android chưa tích hợp.

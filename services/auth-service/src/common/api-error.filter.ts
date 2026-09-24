@@ -34,6 +34,10 @@ export class ApiErrorFilter implements ExceptionFilter {
       typeof body === 'object' && body !== null && 'message' in body
         ? body.message
         : undefined;
+    const rawCode =
+      typeof body === 'object' && body !== null && 'code' in body
+        ? body.code
+        : undefined;
     const details = Array.isArray(rawMessage)
       ? rawMessage.filter((item): item is string => typeof item === 'string')
       : undefined;
@@ -49,7 +53,10 @@ export class ApiErrorFilter implements ExceptionFilter {
     response.setHeader('Cache-Control', 'no-store');
     if (status === 429) response.setHeader('Retry-After', '1');
     response.status(status).json({
-      code: ERROR_CODES[status] ?? 'INTERNAL_ERROR',
+      code:
+        typeof rawCode === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(rawCode)
+          ? rawCode
+          : (ERROR_CODES[status] ?? 'INTERNAL_ERROR'),
       message,
       correlationId,
       ...(details ? { details } : {}),
