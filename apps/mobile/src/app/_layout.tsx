@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { MD3LightTheme, PaperProvider } from "react-native-paper";
+import QueryProvider from "../providers/query-provider";
 
 const theme = {
   ...MD3LightTheme,
@@ -15,8 +16,10 @@ const theme = {
 
 export default function RootLayout() {
   return (
-    <PaperProvider theme={theme}>
-      <Stack screenOptions={{ headerShown: false }} />
-    </PaperProvider>
+    <QueryProvider>
+      <PaperProvider theme={theme}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </PaperProvider>
+    </QueryProvider>
   );
 }
