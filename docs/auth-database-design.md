@@ -1,29 +1,29 @@
 # Thiết kế database Auth Service
 
-**Phiên bản:** 0.4  
-**Ngày:** 2026-09-22  
-**Trạng thái:** Đã có entity, migration và ba bảng trong `auth_db`; kiểm tra schema đạt. Các quy tắc API chưa triển khai.  
-**Database:** `auth_db`  
-**Tài khoản kết nối của service:** `auth_user`  
-**Căn cứ:** [SRS 1.1](../SRS_Inventory_Warehouse_Transfer_System_VI.md), mục 2.4, FR-AUTH-01–03, BR-15, mục 9.1/9.10/10/11.1/11.7 và NFR-06.
+**Phiên bản:** 0.5\
+**Ngày cập nhật:** 2026-10-01\
+**Trạng thái:** Ba bảng nghiệp vụ đã có Prisma schema và migration SQL. Seed Admin, login và `/me` đã triển khai; API quản trị người dùng/quyền và truy vấn audit còn phải làm.
+**Database:** `auth_db`\
+**Tài khoản kết nối của service:** `auth_user`\
+**Căn cứ:** [SRS 1.2](../SRS_Inventory_Warehouse_Transfer_System_VI.md), mục 2.4, FR-AUTH-01–03, BR-15, mục 9.1/9.10/10/11.1/11.7 và NFR-06.
 
 **Bối cảnh toàn hệ thống:** [Thiết kế database tổng quan của 5 service](./database-overview.md).
 
 ## 1. Phạm vi thiết kế từng bước
 
-| Bảng dự kiến | Mục đích | Trạng thái thiết kế |
+| Bảng | Mục đích | Trạng thái thiết kế |
 |---|---|---|
-| `users` | Thông tin đăng nhập, vai trò, kho phụ trách và trạng thái tài khoản | Entity và migration đã kiểm tra |
-| `user_permissions` | Các quyền bổ sung được Admin gán cho từng tài khoản | Entity và migration đã kiểm tra; API phân quyền làm sau |
-| `user_audit_logs` | Lịch sử thay đổi tài khoản, vai trò, kho và quyền | Entity, migration và trigger bảo vệ audit đã kiểm tra; ghi audit nghiệp vụ làm sau |
+| `users` | Thông tin đăng nhập, vai trò, kho phụ trách và trạng thái tài khoản | Prisma model/migration đã có; seed/login/me đã triển khai |
+| `user_permissions` | Các quyền bổ sung được Admin gán cho từng tài khoản | Prisma model/migration đã có; `/me` đọc quyền; API gán/thu hồi làm sau |
+| `user_audit_logs` | Lịch sử thay đổi tài khoản, vai trò, kho và quyền | Migration/trigger đã có; seed ghi audit; API quản trị/truy vấn audit làm sau |
 
 MVP có ba role cố định, mỗi tài khoản một role, nên đề xuất chưa tạo bảng `roles` hoặc `user_roles`. Quyền bổ sung tách thành bảng con để quản lý từng quyền và chống gán trùng. Trường `additional_permissions` trong mô hình User của SRS vẫn được trả dưới dạng danh sách trong API, nhưng được lưu bằng các dòng trong `user_permissions` thay vì thêm một cột trùng dữ liệu vào `users`.
 
 `auth_user` là tài khoản PostgreSQL để service kết nối database. Một bản ghi trong `users` là tài khoản đăng nhập ứng dụng. Hai khái niệm này độc lập.
 
-## 2. Bảng users — đề xuất đầu tiên
+## 2. Bảng users
 
-Mỗi dòng tương ứng một người dùng ứng dụng. Các độ dài trường và ràng buộc database dưới đây đã được đưa vào entity và migration đầu tiên; các quy tắc xử lý đầu vào và phân quyền sẽ được triển khai cùng API.
+Mỗi dòng tương ứng một tài khoản ứng dụng. Các cột và ràng buộc dưới đây được ánh xạ trong Prisma schema và migration SQL. Các quy tắc quản trị người dùng được kiểm tra ở backend khi triển khai API tương ứng.
 
 | Cột | Kiểu PostgreSQL | Bắt buộc | Mặc định | Ý nghĩa |
 |---|---|---|---|---|
@@ -57,7 +57,7 @@ Mỗi dòng tương ứng một người dùng ứng dụng. Các độ dài tr�
 
 - `status` chỉ nhận `ACTIVE` hoặc `INACTIVE`, có CHECK tại database. Tài khoản INACTIVE không được đăng nhập hoặc thực hiện nghiệp vụ theo FR-AUTH-03.
 - MVP vô hiệu hóa tài khoản bằng trạng thái; không cung cấp chức năng xóa vật lý người dùng.
-- `password_hash` không rỗng và không được đưa vào response API hoặc audit. Bước seed dùng scrypt có sẵn trong Node.js, salt ngẫu nhiên, N=131072/r=8/p=1; hàm băm và kiểm tra mật khẩu dùng chung cho bước đăng nhập sau này. Xem [seed Admin](./seed-admin.md).
+- `password_hash` không rỗng và không được đưa vào API/audit. Seed và login dùng chung scrypt với salt ngẫu nhiên, N=131072/r=8/p=1. Prisma Client mặc định bỏ `passwordHash`; truy vấn xác thực chọn rõ trường này khi cần. Xem [seed Admin](./local-development.md#5-seed-admin).
 - Khi tạo: `created_at` và `updated_at` được khởi tạo. Khi chỉnh sửa thông tin, quyền hoặc đổi mật khẩu: service cập nhật `updated_at` trong cùng transaction. `DEFAULT CURRENT_TIMESTAMP` không tự cập nhật cột mỗi lần sửa dòng.
 - API xuất thời điểm theo UTC; giao diện hiển thị theo múi giờ người dùng.
 
@@ -154,7 +154,7 @@ Bảng này lưu các quyền đang được gán. Lịch sử cấp/thu hồi p
 
 ## 4. Bảng user_audit_logs — lịch sử thay đổi tài khoản
 
-Mỗi dòng ghi một sự kiện thay đổi tài khoản đã được lưu thành công: ai thực hiện, thay đổi tài khoản nào, dữ liệu trước/sau và thời gian. Đã có migration tạo bảng và trigger bảo vệ; chưa triển khai API. Lịch sử đăng nhập thất bại và log lỗi kỹ thuật thuộc phần logging riêng, không được ghi thành thay đổi tài khoản thành công trong bảng này.
+Mỗi dòng ghi một sự kiện thay đổi tài khoản đã được lưu thành công: ai thực hiện, thay đổi tài khoản nào, dữ liệu trước/sau và thời gian. Đã có migration tạo bảng và trigger bảo vệ; chưa triển khai API truy vấn audit. Lịch sử đăng nhập thất bại và log lỗi kỹ thuật thuộc phần logging riêng, không được ghi thành thay đổi tài khoản thành công trong bảng này.
 
 ### 4.1. Các cột và quan hệ
 
@@ -190,7 +190,7 @@ Một request thay đổi nhiều trường quản trị ghi một `USER_UPDATED
 
 ### 4.3. Nội dung bản chụp và ràng buộc
 
-Đề xuất `before_data`/`after_data` là JSON object với đúng các trường: `username`, `email`, `role`, `assigned_warehouse_id`, `status`, `additional_permissions`. Đây là dữ liệu từ database do backend chọn rõ từng trường; không sao chép toàn bộ entity hoặc request body vào audit. ID tài khoản đã nằm ở `user_id` nên không cần lặp trong bản chụp.
+Đề xuất `before_data`/`after_data` là JSON object với đúng các trường: `username`, `email`, `role`, `assigned_warehouse_id`, `status`, `additional_permissions`. Đây là dữ liệu từ database do backend chọn rõ từng trường; không sao chép toàn bộ bản ghi hoặc request body vào audit. ID tài khoản đã nằm ở `user_id` nên không cần lặp trong bản chụp.
 
 - `assigned_warehouse_id` là chuỗi UUID hoặc JSON null; `additional_permissions` là mảng mã quyền không trùng, sắp xếp ổn định trước khi so sánh/lưu. Quyền rỗng được ghi `[]`.
 - Backend kiểm tra cấu trúc, kiểu dữ liệu và chỉ giữ các trường cho phép. Không lưu mật khẩu gốc, `password_hash`, JWT, header Authorization hoặc bí mật cấu hình. Bản chụp chứa email nên API audit chỉ dành cho Admin đã xác thực, không xuất vào log công khai.
@@ -239,8 +239,12 @@ Sự kiện là `USER_UPDATED`, có ID Admin thực hiện và thời điểm gh
 - [ ] UPDATE/DELETE/TRUNCATE thông thường bị chặn bởi trigger khi triển khai; disable tài khoản không làm mất lịch sử.
 - [ ] Admin xem/lọc/phân trang được; Manager, Staff và tài khoản INACTIVE bị từ chối, kể cả khi gọi trực tiếp endpoint.
 
-## 5. Bước tiếp theo
+## 5. Triển khai và vận hành
 
-Ngày 2026-09-22 đã có entity và migration ba bảng Auth, cùng 39 ca kiểm tra schema trên PostgreSQL thật. Người dùng đã chạy migration; kiểm tra chỉ đọc xác nhận bảng, lịch sử migration và trigger bảo vệ audit. Xem [hướng dẫn tạo bảng](./auth-database-migration.md). Giữ `synchronize: false`. Người dùng đã chạy [seed Admin](./seed-admin.md); kiểm tra xác nhận 1 Admin ACTIVE và 1 audit tương ứng. Bước tiếp theo là API đăng nhập. Các checklist API phía trên chưa được coi là hoàn thành từ bước seed.
+Cấu trúc đã triển khai được quản lý bằng Prisma schema và migration SQL. CHECK constraint và trigger audit phải được giữ trong migration vì không biểu diễn đầy đủ trong Prisma schema.
 
-Các tham khảo kỹ thuật: [UUID](https://www.postgresql.org/docs/17/datatype-uuid.html), [ràng buộc PostgreSQL](https://www.postgresql.org/docs/17/ddl-constraints.html), [khóa bản ghi](https://www.postgresql.org/docs/17/explicit-locking.html), [JSON/JSONB](https://www.postgresql.org/docs/17/datatype-json.html), [hàm thời gian](https://www.postgresql.org/docs/17/functions-datetime.html) và [trigger](https://www.postgresql.org/docs/17/sql-createtrigger.html).
+HTTP server không tự cập nhật schema. Áp dụng migration theo [hướng dẫn local](./local-development.md).
+
+Auth có seed Admin, login và `/me`. API quản trị người dùng, gán kho/quyền và truy vấn audit được triển khai ở các bước tiếp theo.
+
+Checklist là các ca cần đối chiếu, không thay thế báo cáo kiểm thử. Tiến độ và kết quả đã chạy nằm trong [kế hoạch](../plan.md).

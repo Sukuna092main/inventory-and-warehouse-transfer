@@ -1,16 +1,20 @@
 # SRS – Inventory & Warehouse Transfer System
 ## Hệ thống Quản lý Tồn kho và Điều chuyển Hàng hóa giữa các Kho
 
-**Phiên bản:** 1.1  
-**Ngày cập nhật:** 2026-09-17  
-**Ngôn ngữ tài liệu:** Tiếng Việt  
-**Kiến trúc dự kiến:** Microservices  
-**Số lượng service chính:** 5  
-**API Gateway:** Có  
-**Môi trường triển khai:** Local / Docker Compose  
-**Chi phí dịch vụ bên thứ ba:** Không bắt buộc  
+**Phiên bản:** 1.2\
+**Ngày cập nhật:** 2026-10-01\
+**Ngôn ngữ tài liệu:** Tiếng Việt\
+**Kiến trúc dự kiến:** Microservices\
+**Số lượng service chính:** 5\
+**API Gateway:** Có\
+**Môi trường triển khai:** Local / Docker Compose\
+**Chi phí dịch vụ bên thứ ba:** Không bắt buộc\
 
 **Thay đổi phiên bản 1.1:** Làm rõ phân quyền theo kho, tồn kho ban đầu và điều chỉnh tồn, tính nguyên tử khi giữ chỗ, thao tác bất đồng bộ, phục hồi lỗi và tiêu chí nghiệm thu. Các quy tắc được chốt trong tài liệu này là phạm vi MVP; các lựa chọn triển khai không làm thay đổi quy tắc nghiệp vụ.
+
+**Thay đổi phiên bản 1.2:** Đồng bộ phạm vi web/Android, stack NestJS/Prisma, API tài khoản hiện hành, quản lý phiên, môi trường local và nghiệm thu liên nền tảng. Giữ nguyên mã yêu cầu hiện có và AC-01–27; bổ sung NFR-11 và AC-28–31.
+
+SRS mô tả hệ thống cần đạt khi nghiệm thu, không khẳng định mọi chức năng đã triển khai. Trạng thái hiện tại nằm trong [kế hoạch](./plan.md).
 
 ---
 
@@ -72,6 +76,12 @@ DRAFT / PENDING / APPROVED
             ↓
         CANCELLED
 ```
+
+MVP có giao diện web và ứng dụng Android bằng tiếng Việt. Cả hai cung cấp đầy đủ chức năng theo ma trận quyền, bao gồm quản trị, danh mục, tồn kho, chuyển kho, lịch sử và phục hồi operation.
+
+Trong tài liệu này, “frontend” hoặc “client” áp dụng cho cả web và Android, trừ khi ghi rõ nền tảng. Hai client dùng chung API Gateway, backend và dữ liệu; bố cục được thiết kế phù hợp từng nền tảng.
+
+Backend và web được bàn giao để chạy local bằng Docker Compose. Android bàn giao APK cài trực tiếp, kết nối qua mạng nội bộ và chạy độc lập với Metro.
 
 ---
 
@@ -167,7 +177,7 @@ Admin quản lý các quyền bổ sung. Quyền xem tồn kho khác không tự
 ## 3.1. Kiến trúc đề xuất
 
 ```text
-                     Frontend
+                     Web / Android
                         │
                         ▼
                   API Gateway
@@ -265,13 +275,13 @@ Trách nhiệm:
 
 ## 4.1. Vai trò
 
-Frontend không gọi trực tiếp từng microservice.
+Web và Android chỉ gọi API qua Gateway, không gọi trực tiếp các service nghiệp vụ.
 
-Frontend chỉ giao tiếp với:
+- Máy phát triển: `http://localhost:8080`.
+- Điện thoại thật: `http://<IP-LAN-máy-chạy-hệ-thống>:8080`.
+- Android Studio Emulator mặc định: `http://10.0.2.2:8080`.
 
-```text
-http://localhost:8080
-```
+`localhost` trên điện thoại không trỏ về máy tính. Cổng Metro không phải cổng API Gateway.
 
 API Gateway chịu trách nhiệm:
 
@@ -322,6 +332,10 @@ Người dùng phải có thể đăng nhập bằng:
 
 Sau khi đăng nhập thành công, hệ thống trả về JWT Access Token.
 
+Access token có thời hạn 30 phút; MVP chưa có refresh token. Web giữ token trong bộ nhớ và yêu cầu đăng nhập lại khi tải lại trang. Android lưu token bằng SecureStore, không lưu mật khẩu.
+
+`GET /api/auth/me` trả tài khoản và quyền hiện hành sau khi xác thực. Đăng xuất xóa token và cache phía client; MVP chưa có endpoint thu hồi token riêng cho logout.
+
 ---
 
 ## FR-AUTH-02 – Phân quyền
@@ -333,6 +347,8 @@ Hệ thống phải hỗ trợ tối thiểu các role:
 - WAREHOUSE_STAFF.
 
 MVP sử dụng cố định ba role trên, mỗi tài khoản có một role; không có chức năng tạo role tùy biến. Quyền bổ sung được gán theo danh sách tại mục 2.4.
+
+Gateway và service xác minh JWT. Auth đọc trạng thái/quyền từ database; các service nghiệp vụ kiểm tra thông tin hiện hành qua Auth và tự kiểm tra quyền theo nghiệp vụ/kho. Nếu không xác nhận được quyền do Auth không khả dụng, từ chối request cần xác thực bằng lỗi phù hợp, không dùng quyền cũ để cho phép thao tác.
 
 ---
 
@@ -1187,6 +1203,10 @@ Việc kiểm tra dữ liệu phải thông qua:
 - Event.
 - Local cache nếu có.
 
+Môi trường local dùng một PostgreSQL instance với năm database và năm tài khoản truy cập riêng cho Auth, Product, Warehouse, Inventory và Transfer. Mỗi service chỉ truy cập database của mình.
+
+Prisma schema, client và migration thuộc từng service. Không chia sẻ model truy cập database hoặc repository giữa các service. CHECK constraint, trigger và các thành phần PostgreSQL đặc thù được giữ trong migration SQL.
+
 ---
 
 # 11. API đề xuất
@@ -1195,6 +1215,7 @@ Việc kiểm tra dữ liệu phải thông qua:
 
 ```text
 POST /api/auth/login
+GET  /api/auth/me
 POST /api/users
 GET  /api/users
 GET  /api/users/{id}
@@ -1202,6 +1223,10 @@ PUT  /api/users/{id}
 PATCH /api/users/{id}/status
 GET  /api/users/audit
 ```
+
+`/api/auth/me` trả `id`, `username`, `email`, `role`, `assignedWarehouseId`, `status` và `additionalPermissions` từ dữ liệu hiện hành; không trả password hash. Token thiếu/sai/hết hạn hoặc tài khoản không còn hợp lệ trả 401. Lỗi mạng/server không đồng nghĩa token hết hạn.
+
+Hợp đồng Auth đã triển khai nằm trong [OpenAPI Auth](./docs/api/auth.openapi.json). Các API còn lại trong mục này là yêu cầu, chưa mặc nhiên khả dụng.
 
 ---
 
@@ -1267,6 +1292,8 @@ POST /api/transfers/{id}/operations/{operationId}/recover
 
 `recover` chỉ dành cho Admin, tiếp tục operation hiện tại với cùng định danh, không tạo một lần biến động tồn mới. Các route tĩnh như `/audit` phải được phân biệt với route `/{id}`.
 
+Danh sách transfer hỗ trợ lọc theo trạng thái operation để tìm thao tác đang xử lý hoặc cần phục hồi. Bộ lọc tuân theo quyền xem phiếu và áp dụng trước phân trang.
+
 ## 11.6. Hợp đồng xử lý bất đồng bộ
 
 Approve, cancel APPROVED, ship và receive trả `202 ACCEPTED` khi đã lưu bền vững thao tác và outbox; chưa có nghĩa là nghiệp vụ đã hoàn tất.
@@ -1281,7 +1308,11 @@ Approve, cancel APPROVED, ship và receive trả `202 ACCEPTED` khi đã lưu b�
 }
 ```
 
-Frontend truy vấn `statusUrl` cho đến khi thao tác có kết quả hoặc cần phục hồi. API tra cứu operation trả `200` cùng trạng thái, mã lỗi và chi tiết nếu có, tuân theo quyền xem phiếu. Các request bị lỗi xác thực, phân quyền, dữ liệu, trạng thái hoặc xung đột thao tác được từ chối trước khi tiếp nhận bằng HTTP 4xx.
+Khi màn hình đang mở, client truy vấn `statusUrl` mỗi 2 giây trong lúc operation còn PROCESSING; dừng polling khi có kết quả cuối cùng hoặc cần phục hồi. Khi quay lại màn hình/foreground hoặc có mạng, tải lại trạng thái từ server.
+
+Timeout hoặc mất kết nối không chứng minh thao tác thất bại. Khi thử lại cùng thao tác, giữ nguyên Idempotency-Key; không tạo giao dịch mới thay thế một operation chưa rõ kết quả.
+
+API tra cứu operation trả `200` cùng trạng thái, mã lỗi và chi tiết nếu có, tuân theo quyền xem phiếu. Các request bị lỗi xác thực, phân quyền, dữ liệu, trạng thái hoặc xung đột thao tác được từ chối trước khi tiếp nhận bằng HTTP 4xx.
 
 Tạo transfer trả `201`; sửa nháp, submit và cancel DRAFT/PENDING xử lý đồng bộ trả `200`. Khởi tạo tồn kho và tạo điều chỉnh trả `201` sau khi transaction Inventory commit. Request thiếu Idempotency-Key tại endpoint bắt buộc trả `400`.
 
@@ -1571,77 +1602,57 @@ Mỗi transaction cục bộ phải bảo toàn bất biến tồn kho; outbox/i
 
 ---
 
-# 15. Công nghệ đề xuất
+## NFR-11 – Vòng đời ứng dụng và kết nối
 
-Một stack tham khảo:
-
-```text
-Backend:
-- Spring Boot
-
-API Gateway:
-- Spring Cloud Gateway
-
-Authentication:
-- Spring Security
-- JWT
-
-Database:
-- PostgreSQL
-
-Message Broker:
-- RabbitMQ
-
-Cache:
-- Redis (optional)
-
-Frontend:
-- React hoặc Vue
-
-Container:
-- Docker
-- Docker Compose
-
-API Testing:
-- Postman hoặc Bruno
-```
-
-Tất cả các thành phần trên đều có thể chạy local mà không cần dịch vụ cloud trả phí.
+- Android tải lại tài khoản/quyền khi khởi động và trở lại foreground.
+- Khi mạng phục hồi, tải lại quyền và dữ liệu đang xem từ server.
+- `/me` trả 401: xóa phiên/token/cache, yêu cầu đăng nhập lại với thông báo rõ.
+- Lỗi mạng/server: giữ token, thông báo dữ liệu chưa xác nhận lại và cung cấp nút thử lại.
+- Đăng xuất phải hủy request đang chạy và xóa cache; phản hồi đến muộn không được khôi phục tài khoản đã đăng xuất.
+- Đổi tài khoản không hiển thị cache của người dùng trước.
+- Mất mạng thì khóa thao tác ghi, thông báo rõ và không xếp hàng nghiệp vụ offline.
+- Bàn phím và kích thước màn hình Android không làm mất khả năng tiếp cận ô nhập hoặc nút hành động.
 
 ---
 
-# 16. Docker Compose
+# 15. Công nghệ đã chọn
 
-Hệ thống có thể được chạy bằng:
+| Thành phần | Lựa chọn |
+|---|---|
+| Ngôn ngữ/runtime | TypeScript strict, Node.js 24 |
+| Package | pnpm; hướng tới workspace chung |
+| Backend/Gateway | NestJS với Express; Gateway chuyển tiếp HTTP |
+| Database/ORM | PostgreSQL, Prisma; migration riêng từng service |
+| Messaging | RabbitMQ và amqplib |
+| Web | React, Vite, React Router, Material UI |
+| Android | React Native, Expo, Expo Router, React Native Paper |
+| Dữ liệu/biểu mẫu client | TanStack Query; React Hook Form và Zod theo kế hoạch |
+| Token Android | Expo SecureStore |
+| API | OpenAPI/Swagger, bộ request Bruno |
+| Kiểm thử | Jest/Supertest; Vitest/Testing Library/Playwright; kiểm tra Android thực tế |
+| Đóng gói | Docker Compose; Android SDK và Gradle cho APK |
 
-```bash
-docker compose up -d
-```
+Phiên bản dependency nằm trong manifest và lockfile. React/React Native của mobile đi theo Expo SDK. Không nâng major trong MVP nếu chưa thống nhất lý do và kiểm tra tương thích. Trạng thái áp dụng nằm trong [kế hoạch](./plan.md).
 
-Các container dự kiến:
+---
 
-```text
-api-gateway
-auth-service
-product-service
-warehouse-service
-inventory-service
-transfer-service
+# 16. Triển khai local
 
-postgres-auth
-postgres-product
-postgres-warehouse
-postgres-inventory
-postgres-transfer
+Cấu hình bàn giao cần có:
 
-rabbitmq
-redis
-frontend
-```
+- Gateway công khai cổng 8080, phục vụ API và web.
+- Năm service Auth, Product, Warehouse, Inventory, Transfer trong mạng Docker.
+- Một PostgreSQL instance, năm database/user riêng.
+- RabbitMQ; volume bền vững cho PostgreSQL và RabbitMQ.
+- Health/readiness check và cơ chế chờ dependency sẵn sàng.
 
-Redis có thể bỏ nếu phiên bản đầu chưa cần.
+Sau khi cấu hình đầy đủ, khởi động bằng Docker Compose theo hướng dẫn. Compose hiện mới chạy PostgreSQL; trạng thái triển khai không được nhầm với cấu hình bàn giao yêu cầu.
 
-Repository phải có hướng dẫn cấu hình, migration/schema, khởi tạo Admin và dữ liệu demo gồm tối thiểu hai kho, sản phẩm và tồn ban đầu. Seed chạy lại không tạo dữ liệu trùng hoặc ghi đè dữ liệu nghiệp vụ. Các service chờ dependency sẵn sàng bằng health check hoặc retry kết nối. Khởi động lại không mất số dư, message và dữ liệu chống trùng.
+Android dùng IP LAN hoặc địa chỉ host của emulator. APK demo local có cấu hình HTTP nội bộ; ngoại lệ này tách khỏi cấu hình HTTPS tương lai. APK release phải chạy khi Metro/dev server đã tắt.
+
+Repository phải có hướng dẫn cấu hình, migration, seed Admin và dữ liệu demo gồm tối thiểu hai kho, sản phẩm và tồn ban đầu. Seed chạy lại không tạo trùng hoặc ghi đè dữ liệu nghiệp vụ. Khởi động lại giữ được số dư, message và thông tin chống trùng.
+
+Hướng dẫn hiện hành: [chạy local](./docs/local-development.md).
 
 ---
 
@@ -1656,7 +1667,9 @@ Các chức năng sau không bắt buộc trong MVP:
 - Quản lý nhà cung cấp.
 - Purchase Order.
 - Barcode scanner phần cứng.
-- Mobile App.
+- iOS và phát hành Google Play.
+- Nghiệp vụ offline hoặc đồng bộ giao dịch offline.
+- Redis, Kubernetes, refresh token và push notification.
 - AI demand forecasting.
 - Automatic warehouse replenishment.
 - Email/SMS thật.
@@ -1696,6 +1709,8 @@ Phiên bản đầu tiên nên tập trung vào:
 18. Hủy transfer và giải phóng giữ chỗ theo trạng thái hợp lệ.
 19. Theo dõi hàng đang vận chuyển và lịch sử biến động tồn.
 20. Theo dõi/phục hồi thao tác lỗi, outbox, chống lặp và DLQ.
+
+Toàn bộ chức năng người dùng trong MVP phải truy cập được trên web và Android theo cùng ma trận quyền, bao gồm quản trị người dùng/quyền, khởi tạo/điều chỉnh tồn, audit và phục hồi operation.
 
 ---
 
@@ -1810,6 +1825,24 @@ Phát lại result reserve sau khi phiếu đã SHIPPED hoặc COMPLETED không 
 ### AC-27 – Khả năng sử dụng và hiệu năng
 
 Frontend thể hiện PROCESSING, FAILED và RECOVERY_REQUIRED, cho phép xem lỗi nhưng không gửi thao tác xung đột. API phân trang/lọc đúng quyền; bài đo đạt mục tiêu NFR-02 với cấu hình máy được ghi nhận.
+
+### AC-28 – Đầy đủ chức năng trên hai nền tảng
+
+Web và Android cung cấp toàn bộ chức năng theo ma trận quyền, bao gồm quản trị và phục hồi. Kiểm tra với từng vai trò; không có chức năng bắt buộc chỉ thao tác được qua công cụ gọi API.
+
+### AC-29 – Luồng chuyển kho liên nền tảng
+
+Tạo phiếu trên web, duyệt/xuất trên Android và nhận trên web; thực hiện thêm chiều ngược lại. Đối chiếu trạng thái, số dư, giữ chỗ, hàng đang vận chuyển và lịch sử; kết quả nhất quán và không xử lý trùng.
+
+### AC-30 – Khôi phục phiên và trạng thái
+
+Khi mở lại Android, quay lại foreground hoặc có mạng, ứng dụng tải lại trạng thái/quyền từ server. Phiên không hợp lệ yêu cầu đăng nhập lại; lỗi mạng/server giữ token và ghi rõ dữ liệu chưa xác nhận lại.
+
+Đăng xuất trong lúc tải không bị phản hồi đến muộn khôi phục tài khoản. Đổi tài khoản không thấy cache người dùng trước. Timeout và thử lại không tạo giao dịch trùng.
+
+### AC-31 – APK độc lập
+
+APK release cài trực tiếp trên Android, kết nối hệ thống local qua cấu hình phù hợp và thực hiện được các luồng theo quyền sau khi Metro/dev server đã tắt.
 
 ---
 

@@ -1,0 +1,236 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Inventory Auth API",
+    "version": "0.2.1",
+    "description": "Login và tài khoản/quyền hiện hành qua Gateway. Chỉ mô tả API đã triển khai."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Gateway local; Android thật dùng IP LAN của máy"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Auth trực tiếp, chỉ kiểm tra nội bộ"
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Đăng nhập bằng username hoặc email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "identifier",
+                  "password"
+                ],
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 254,
+                    "description": "Username/email, trim và chuyển chữ thường"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "writeOnly": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đăng nhập thành công; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "accessToken",
+                    "tokenType",
+                    "expiresIn"
+                  ],
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "description": "JWT ký HS256, sub=user ID, issuer=inventory-auth, audience=inventory-api"
+                    },
+                    "tokenType": {
+                      "type": "string",
+                      "enum": [
+                        "Bearer"
+                      ]
+                    },
+                    "expiresIn": {
+                      "type": "integer",
+                      "enum": [
+                        1800
+                      ],
+                      "description": "Thời hạn tính bằng giây"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "429": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "summary": "Lấy tài khoản, vai trò, kho và quyền bổ sung hiện hành",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thông tin hiện hành từ database; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "username",
+                    "email",
+                    "role",
+                    "assignedWarehouseId",
+                    "status",
+                    "additionalPermissions"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "username": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string",
+                      "format": "email"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "ADMIN",
+                        "WAREHOUSE_MANAGER",
+                        "WAREHOUSE_STAFF"
+                      ]
+                    },
+                    "assignedWarehouseId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE"
+                      ]
+                    },
+                    "additionalPermissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "VIEW_OTHER_INVENTORY",
+                          "SHIP_TRANSFER",
+                          "RECEIVE_TRANSFER",
+                          "ADJUST_INVENTORY"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ApiError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ApiError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "responses": {
+      "ApiError": {
+        "description": "Lỗi có code, message và correlationId; 429 có Retry-After: 1",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": [
+                "code",
+                "message",
+                "correlationId"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "correlationId": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

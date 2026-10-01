@@ -1,10 +1,10 @@
 # Kế hoạch phát triển Inventory & Warehouse Transfer System
 
-**Nền tảng:** Web và Android  
-**Phiên bản kế hoạch:** 1.0  
-**Ngày cập nhật:** 2026-09-23  
-**Tài liệu nghiệp vụ hiện hành:** [SRS phiên bản 1.1](./SRS_Inventory_Warehouse_Transfer_System_VI.md)  
-**Trạng thái dự án:** Auth đã có database, Admin seed và API đăng nhập được kiểm thử; chờ cấu hình JWT local và test thủ công, chưa có giao diện đăng nhập  
+**Nền tảng:** Web và Android\
+**Phiên bản kế hoạch:** 1.1\
+**Ngày cập nhật:** 2026-10-01\
+**Tài liệu nghiệp vụ hiện hành:** [SRS phiên bản 1.2](./SRS_Inventory_Warehouse_Transfer_System_VI.md)\
+**Trạng thái dự án:** Auth/Gateway đã có login và `/me`; người dùng đã xác nhận đăng nhập web/Android. Android đang tích hợp cập nhật phiên/quyền theo vòng đời ứng dụng. Các service nghiệp vụ còn lại chưa triển khai.
 **Thời gian mục tiêu:** 8 tuần, điều chỉnh theo tiến độ thực tế
 
 > Đây là tài liệu để cùng học, thống nhất và theo dõi công việc. Các công việc trong kế hoạch không đồng nghĩa với việc sẽ được tự động triển khai toàn bộ ngay lập tức.
@@ -18,12 +18,14 @@
 5. [Ma trận chức năng và tiến độ](#5-ma-trận-chức-năng-và-tiến-độ)
 6. [Lộ trình mục tiêu 8 tuần](#6-lộ-trình-mục-tiêu-8-tuần)
 7. [Kiểm thử và nghiệm thu](#7-kiểm-thử-và-nghiệm-thu)
-8. [Các cập nhật cần đưa vào SRS](#8-các-cập-nhật-cần-đưa-vào-srs)
+8. [Quản lý tài liệu](#8-quản-lý-tài-liệu)
 9. [Rủi ro và cách xử lý](#9-rủi-ro-và-cách-xử-lý)
 10. [Nhật ký quyết định](#10-nhật-ký-quyết-định)
 11. [Bước tiếp theo](#11-bước-tiếp-theo)
 
 ## 1. Cách làm việc cùng nhau
+
+- Trợ lý gửi code/nội dung trong chat để người dùng áp dụng thủ công; chỉ chỉnh trực tiếp khi được yêu cầu rõ. Đợt tinh gọn tài liệu ngày 2026-10-01 được người dùng cho phép chỉnh trực tiếp.
 
 - Người thực hiện chính là một người, đã quen React/JavaScript. Trợ lý hỗ trợ giải thích, thiết kế, viết mã và kiểm tra theo từng phần đã thống nhất.
 - Trước mỗi bước, nói rõ mục tiêu, vì sao cần làm, đầu ra và những file dự kiến tạo hoặc sửa.
@@ -79,7 +81,7 @@ Phiếu DRAFT/PENDING/APPROVED được hủy theo điều kiện và quyền tr
 - Một tài khoản phụ trách nhiều kho, duyệt nhiều cấp, tự hết hạn giữ chỗ.
 - Báo cáo nâng cao, AI và tự động bổ sung hàng.
 
-Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web và Android trong kế hoạch này là thay đổi đã thống nhất cần đồng bộ vào SRS, vì SRS hiện vẫn đặt Mobile App ngoài MVP.
+Phạm vi và giới hạn nghiệp vụ tuân theo SRS 1.2.
 
 ## 3. Tech stack đã chọn
 
@@ -91,7 +93,7 @@ Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web v�
 | Backend        | NestJS với Express                                        | Tổ chức controller, service, validation và phân quyền                                    |
 | API Gateway    | NestJS + HTTP proxy                                       | Định tuyến, xác thực sơ bộ, CORS, correlation ID                                         |
 | Database       | PostgreSQL                                                | Lưu nghiệp vụ, ràng buộc và transaction                                                  |
-| ORM            | Prisma ORM 7                                              | Lựa chọn mới; chuyển Auth từ TypeORM, quản lý schema/client/migration riêng từng service |
+| ORM            | Prisma ORM 7                                              | Auth đã dùng Prisma; schema/client/migration riêng từng service |
 | Messaging      | RabbitMQ + amqplib trong module NestJS                    | Command/result, publisher confirm, manual ACK                                            |
 | Web            | React + Vite + React Router                               | Ứng dụng quản trị dạng SPA                                                               |
 | UI web         | Material UI, thành phần miễn phí                          | Bảng, biểu mẫu, bộ lọc và hộp thoại                                                      |
@@ -110,15 +112,15 @@ Các giới hạn nghiệp vụ còn lại tuân theo SRS 1.1. Yêu cầu web v�
 ### 3.1. Lý do chọn hướng này
 
 - Phù hợp kiến thức React/JavaScript hiện có; không thêm Java hoặc Dart vào giai đoạn MVP.
-- NestJS tổ chức backend theo module. Theo lựa chọn ngày 2026-09-23, dùng Prisma ORM 7 để truy vấn và quản lý migration; các thao tác cần transaction/khóa PostgreSQL vẫn phải thiết kế theo nghiệp vụ. Auth đã chuyển mã chạy, test và dependency sang Prisma theo [kế hoạch đổi ORM](./docs/prisma-transition.md). Xem [trạng thái phát hành Prisma](https://www.prisma.io/docs/orm/release-status).
+- NestJS tổ chức backend theo module. Theo lựa chọn ngày 2026-09-23, dùng Prisma ORM 7 để truy vấn và quản lý migration; các thao tác cần transaction/khóa PostgreSQL vẫn phải thiết kế theo nghiệp vụ. Auth đã chuyển mã chạy, test và dependency sang Prisma theo [hướng dẫn Prisma và migration](./docs/local-development.md). Phiên bản Auth đã chốt là 7.10.0 trong manifest/lockfile.
 - Web và Android có thể dùng chung kiểu dữ liệu, API client và quy tắc validation phía giao diện. Bố cục và component hiển thị được phát triển riêng theo nền tảng.
 - Expo hỗ trợ pnpm monorepo và build Android tại máy. APK bàn giao phải chạy độc lập; Expo Go chỉ là lựa chọn thử nghiệm ban đầu. Xem [Expo Monorepos](https://docs.expo.dev/guides/monorepos/) và [Build Local](https://docs.expo.dev/guides/local-app-overview/).
 - Material UI và React Native Paper cung cấp component để tập trung vào chức năng nghiệp vụ. Chỉ dùng thành phần miễn phí và bản stable. Xem [Material UI](https://mui.com/material-ui/getting-started/) và [React Native Paper](https://oss.callstack.com/react-native-paper/).
 
 ### 3.2. Quy ước phiên bản
 
-- Chưa cài dependency trong bước hoàn thiện tài liệu này.
-- Khi đến bước khởi tạo, kiểm tra các phiên bản stable tương thích rồi lưu phiên bản cụ thể trong manifest và lockfile.
+- Auth, Gateway, web và mobile đã có dependency; quản lý phiên bản bằng manifest/lockfile của từng thành phần.
+- Với thành phần mới, kiểm tra phiên bản stable tương thích khi khởi tạo; giữ lockfile để tái tạo môi trường.
 - Phiên bản React Native và React của mobile đi theo Expo SDK; kiểm tra thư viện dùng chung tương thích với cả web và mobile.
 - Không nâng major trong quá trình làm MVP nếu không có nguyên nhân cụ thể đã được trao đổi.
 - Không dùng tag `latest` trong cấu hình build bàn giao; môi trường chạy phải tái tạo được.
@@ -163,7 +165,7 @@ plan.md
 SRS_Inventory_Warehouse_Transfer_System_VI.md
 ```
 
-Ngày 2026-09-22 đã tạo thư mục giữ chỗ và README cho bốn service còn lại cùng `apps/api-gateway`, `apps/web`, `apps/mobile`; các phần này chưa khởi tạo ứng dụng hoặc cài dependency. Auth Service đã có mã nguồn và kết nối database. Các thư mục `packages`, `infra`, `tests` ở gốc vẫn là dự kiến. Mỗi service khi triển khai sẽ có source, cấu hình, migration, kiểm thử và Docker image riêng. Cùng repository không có nghĩa là dùng chung database hoặc cùng một tiến trình.
+Auth, Gateway, web và mobile đã có ứng dụng. Bốn service nghiệp vụ còn lại mới giữ chỗ. Các thư mục `packages`, `infra`, `tests` ở gốc và workspace chung vẫn là dự kiến; hiện từng ứng dụng có manifest/lockfile riêng. Mỗi service khi triển khai có source, cấu hình, migration, kiểm thử và Docker image riêng; không dùng chung database hoặc tiến trình.
 
 Package dùng chung chỉ chứa hợp đồng API/message, API client, validation phía client và cấu hình công cụ. Không chia sẻ entity/repository giữa service; không truy vấn chéo database. Backend tự kiểm tra đầu vào và quyền, không tin validation của client.
 
@@ -216,6 +218,8 @@ Trước khi viết phần này, cần cùng thiết kế chi tiết các bướ
 
 ### 4.7. Môi trường local và APK
 
+Đây là cấu hình bàn giao mục tiêu. Compose hiện chỉ có PostgreSQL; xem [hướng dẫn chạy hiện hành](./docs/local-development.md).
+
 - Compose mặc định có một PostgreSQL instance, 5 database và 5 tài khoản truy cập riêng cho các service; không cấp quyền truy vấn chéo database.
 - Chạy thêm RabbitMQ, Gateway, năm service và web. PostgreSQL/RabbitMQ có volume bền vững.
 - Gateway công khai cổng 8080, định tuyến API và web; các API nghiệp vụ nằm trong mạng Docker.
@@ -235,25 +239,25 @@ Tất cả nhóm chức năng dưới đây đều có trên cả web và Androi
 | ------- | ---------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | PREP-01 | Chốt nền tảng, phạm vi và hướng công nghệ            | DONE        | TypeScript, web + Android đầy đủ, local + APK                                                                                                                                                                                                                                                                        |
 | PREP-02 | Hoàn thiện `plan.md`                                 | DONE        | Tài liệu hiện tại; không bao gồm triển khai code                                                                                                                                                                                                                                                                     |
-| PREP-03 | Đồng bộ SRS lên 1.2                                  | TODO        | Thực hiện ở bước riêng đã thống nhất                                                                                                                                                                                                                                                                                 |
+| PREP-03 | Đồng bộ SRS lên 1.2 | DONE | 2026-10-01: kiểm tra 68 liên kết/anchor nội bộ, AC-01–27 giữ nguyên, bổ sung AC-28–31/NFR-11; hợp đồng OpenAPI không đổi |
 | PREP-04 | Giải thích và thống nhất kiến trúc chi tiết          | TODO        | Bắt đầu từ một ví dụ chuyển kho                                                                                                                                                                                                                                                                                      |
-| PREP-05 | Thiết kế dữ liệu và hợp đồng API/message             | IN_PROGRESS | Có bản nháp tổng quan 5 service tại docs/database-overview.md (v0.1), sơ đồ docs/database.dbml và thiết kế Auth v0.4 đã có entity/migration được kiểm tra. Thiết kế chi tiết các service còn lại và hợp đồng API/message chưa hoàn tất                                                                               |
+| PREP-05 | Thiết kế dữ liệu và hợp đồng API/message | IN_PROGRESS | Có tổng quan năm service, DBML và Auth/Prisma; schema và hợp đồng các service khác chưa hoàn tất |
 | PREP-06 | Danh sách màn hình và luồng điều hướng web/Android   | TODO        | Bao gồm màn hình quản trị và phục hồi                                                                                                                                                                                                                                                                                |
 | PREP-07 | Kiểm tra môi trường, chốt phiên bản dependency       | IN_PROGRESS | Node.js/pnpm và khung NestJS đã chạy; môi trường database, web, Android và bộ phiên bản toàn dự án còn cần kiểm tra                                                                                                                                                                                                  |
 | PREP-08 | Khởi tạo và chạy Auth Service                        | DONE        | Người dùng tạo bằng NestJS CLI, duyệt hai build script và cài dependency; GET http://localhost:3000 trả HTTP 200, nội dung Hello World!                                                                                                                                                                              |
 | PREP-09 | PostgreSQL local, pgAdmin và database/tài khoản Auth | DONE        | Người dùng xác nhận ngày 2026-09-18 đã hoàn tất các bước kiểm tra; kết nối 127.0.0.1:5433, database auth_db, tài khoản auth_user                                                                                                                                                                                     |
-| PREP-10 | Kết nối NestJS với auth_db                           | DONE        | Kiểm tra ngày 2026-09-22 qua TypeORM DataSource của Nest: auth_db / auth_user, 0 bảng public; synchronize và migrationsRun đều false. Build, unit test và lint đạt; xem docs/auth-database-connection.md                                                                                                             |
-| PREP-11 | Tạo thư mục giữ chỗ cho các thành phần còn lại       | DONE        | Ngày 2026-09-22: bốn service, Gateway, web và mobile có README mô tả trách nhiệm và trạng thái Chưa triển khai; chưa khởi tạo ứng dụng hoặc cấu hình workspace                                                                                                                                                       |
-| PREP-12 | Entity và migration đầu tiên cho Auth                | DONE        | Người dùng đã chạy migration; kiểm tra chỉ đọc ngày 2026-09-22 xác nhận ba bảng nghiệp vụ, auth_migrations, bản ghi CreateAuthTables1790035200000 và trigger bảo vệ audit đang bật. Trước đó 39 ca kiểm tra PostgreSQL, build, lint, unit/e2e đạt; xem docs/auth-database-migration.md                               |
-| PREP-13 | Seed Admin đầu tiên từ cấu hình local                | DONE        | Người dùng đã chạy seed; kiểm tra chỉ đọc xác nhận 1 Admin ACTIVE và 1 audit SYSTEM / USER_CREATED từ seed. Unit test và 8 ca seed trên PostgreSQL đã đạt, bao gồm chạy đồng thời; xem docs/seed-admin.md                                                                                                            |
-| PREP-14 | Chuyển Auth từ TypeORM sang Prisma                   | DONE        | Baseline `0_auth_baseline` đã applied trong `auth_db`; login, seed và test setup dùng Prisma/baseline SQL. Source, manifest và lockfile không còn TypeORM. Sau khi gỡ dependency: 26 unit, 68 database, 1 e2e, build và lint đạt. Xem docs/prisma-baseline.md và docs/prisma-transition.md                           |
-| PREP-15 | Gateway chuyển tiếp login và me của Auth             | DONE        | Đã chuẩn bị ứng dụng NestJS, JWT sơ bộ, CORS, correlation ID; kiểm tra kiểu và 5 ca HTTP đạt khi dùng package NestJS sẵn có của Auth. Chờ người dùng cài dependency/cấu hình local để chạy `pnpm build` và `pnpm test` trong Gateway. Xem apps/api-gateway/README.md; đã kiểm tra login/me với Auth thật qua Gateway |
+| PREP-10 | Kết nối NestJS với auth_db | DONE | Auth kết nối bằng Prisma; xem docs/local-development.md |
+| PREP-11 | Tạo thư mục các thành phần | DONE | Auth, Gateway, web, mobile đã có ứng dụng; bốn service nghiệp vụ còn lại giữ chỗ |
+| PREP-12 | Schema và migration đầu tiên cho Auth | DONE | Ba bảng nghiệp vụ, constraint và trigger audit được giữ trong baseline Prisma |
+| PREP-13 | Seed Admin đầu tiên | DONE | Đã kiểm tra; chạy lại không đổi tài khoản có sẵn; xem docs/local-development.md |
+| PREP-14 | Chuyển Auth sang Prisma | DONE | Baseline applied, giữ database/Admin và lịch sử migration; API/seed/test dùng Prisma |
+| PREP-15 | Gateway chuyển tiếp login và me | DONE | Người dùng gửi kết quả 5/5 test đạt, đã kiểm tra qua Auth thật; xem apps/api-gateway/README.md |
 
 ### 5.2. Theo dõi triển khai theo chức năng
 
 | Mã      | Nhóm chức năng                                             | Tham chiếu SRS                      | Backend     | Web  | Android | Kiểm thử    |
 | ------- | ---------------------------------------------------------- | ----------------------------------- | ----------- | ---- | ------- | ----------- |
-| FEAT-01 | Đăng nhập, thông tin tài khoản, đăng xuất, quyền hiện hành | FR-AUTH-01/02, NFR-01, AC-01/23     | IN_PROGRESS | TODO | TODO    | IN_PROGRESS |
+| FEAT-01 | Đăng nhập, tài khoản, đăng xuất, quyền hiện hành | FR-AUTH-01/02, NFR-01/11, AC-01/23/30 | IN_PROGRESS | IN_PROGRESS | IN_PROGRESS | IN_PROGRESS |
 | FEAT-02 | Quản lý người dùng, role, kho và quyền bổ sung             | FR-AUTH-03, mục 2.4                 | TODO        | TODO | TODO    | TODO        |
 | FEAT-03 | Danh mục sản phẩm, tìm kiếm, trạng thái                    | FR-PRODUCT-01–04, BR-16, AC-02/24   | TODO        | TODO | TODO    | TODO        |
 | FEAT-04 | Danh mục kho, tìm kiếm, trạng thái                         | FR-WH-01–03, BR-16, AC-02/24        | TODO        | TODO | TODO    | TODO        |
@@ -266,7 +270,9 @@ Tất cả nhóm chức năng dưới đây đều có trên cả web và Androi
 | FEAT-11 | Lịch sử phiếu, biến động và audit                          | FR-TR-10, FR-INV-11, NFR-06, AC-25  | TODO        | TODO | TODO    | TODO        |
 | FEAT-12 | Hàng đang vận chuyển                                       | FR-INV-11, AC-25                    | TODO        | TODO | TODO    | TODO        |
 | FEAT-13 | Operation, lỗi, đối soát và phục hồi cho Admin             | FR-TR-13, mục 7/8, AC-19/21/22/26   | TODO        | TODO | TODO    | TODO        |
-| FEAT-14 | Phân trang, bộ lọc, trạng thái tải/rỗng/lỗi/mất mạng       | mục 11.7, AC-27; bổ sung mobile     | TODO        | TODO | TODO    | TODO        |
+| FEAT-14 | Phân trang, bộ lọc, trạng thái tải/rỗng/lỗi/mất mạng       | mục 11.7, NFR-11, AC-27/30     | TODO        | TODO | TODO    | TODO        |
+
+FEAT-01 đã có login/me ở Auth/Gateway và người dùng xác nhận đăng nhập web/Android. Android có quyền bổ sung và QueryProvider kết nối AppState. Chưa đánh dấu DONE: `/me` chưa tích hợp đầy đủ TanStack Query, AbortSignal, xử lý 401/lỗi mạng và phản hồi đến muộn khi logout. Tải lại khi mạng phục hồi là bước riêng; các ca nghiệm thu phiên còn phải chạy.
 
 Low stock trong FR-INV-08 vẫn là tùy chọn, không được tự đưa vào phần bắt buộc hoặc ảnh hưởng nghiệm thu các chức năng chính.
 
@@ -336,11 +342,11 @@ Các test làm thay đổi dữ liệu dùng môi trường test riêng, không 
 - [ ] Compose khởi động lại giữ nguyên dữ liệu và message; migration/seed chạy lại an toàn.
 - [ ] APK release cài mới và chạy khi Metro/dev server đã tắt.
 
-### 7.3. Tiêu chí bổ sung dự kiến cho SRS 1.2
+### 7.3. Tiêu chí liên nền tảng trong SRS 1.2
 
-Giữ AC-01 đến AC-27. Các mã sau mới là dự kiến trong kế hoạch, chưa được ghi vào SRS:
+Giữ AC-01–27. AC-28–31 đã được đưa vào SRS 1.2; bảng dưới đây tóm tắt để theo dõi:
 
-| Mã dự kiến | Tiêu chí                                                                                                                |
+| Mã | Tiêu chí                                                                                                                |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------- |
 | AC-28      | Web và Android đều cung cấp đầy đủ chức năng theo ma trận quyền, kể cả quản trị và phục hồi                             |
 | AC-29      | Một phiếu được xử lý luân phiên giữa hai nền tảng, số dư/trạng thái/lịch sử cuối cùng nhất quán                         |
@@ -359,23 +365,15 @@ Giữ AC-01 đến AC-27. Các mã sau mới là dự kiến trong kế hoạch,
 - [ ] Hướng dẫn kiểm tra lỗi, đối soát và phục hồi operation.
 - [ ] Hướng dẫn chạy từ môi trường mới và kịch bản demo/báo cáo.
 
-## 8. Các cập nhật cần đưa vào SRS
+## 8. Quản lý tài liệu
 
-**SRS hiện được giữ nguyên ở phiên bản 1.1.** Việc cập nhật SRS là một bước riêng; hoàn thiện `plan.md` không tự thực hiện các thay đổi sau.
+- [SRS 1.2](./SRS_Inventory_Warehouse_Transfer_System_VI.md): yêu cầu và tiêu chí nghiệm thu.
+- [Mục lục](./docs/README.md): nơi tìm tài liệu dùng chung.
+- [Chạy local](./docs/local-development.md): cấu hình, migration, seed và kiểm tra.
+- [API Guide](./docs/api-guide.md) và [OpenAPI Auth](./docs/api/auth.openapi.json): tích hợp API.
+- Thiết kế database/DBML giữ riêng, phân biệt đề xuất với schema đã triển khai.
 
-| Khu vực SRS                    | Nội dung cần đồng bộ lên 1.2                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Giới thiệu, phạm vi, kiến trúc | Hai client web/Android dùng chung Gateway và backend                                              |
-| Vai trò và chức năng           | Ma trận quyền áp dụng trên cả hai nền tảng, mobile có cả quản trị                                 |
-| Auth/API                       | `/api/auth/me`, access token 30 phút, không refresh token, hành vi đăng nhập lại và logout client |
-| Transfer/API                   | Lọc theo trạng thái operation, xử lý timeout và polling từ hai client                             |
-| Công nghệ                      | Thay stack Spring Boot/Spring Security tham khảo bằng NestJS/TypeScript; chốt React và Expo       |
-| Database và Compose            | Một PostgreSQL instance local, 5 database/user riêng; vẫn giữ database-per-service                |
-| Phạm vi MVP                    | Đưa Android vào bắt buộc; bỏ Mobile App khỏi danh sách ngoài phạm vi                              |
-| Phi chức năng                  | Vòng đời app, mất mạng, cache theo tài khoản, địa chỉ API theo môi trường                         |
-| Nghiệm thu và bàn giao         | Bổ sung AC-28–31, APK độc lập và kịch bản liên nền tảng                                           |
-
-Khi đồng bộ, rà lại toàn bộ các chỗ đề cập “frontend” để xác định áp dụng cho cả hai client; không chỉ thêm một mục Mobile rồi để các phần còn lại mâu thuẫn.
+Không lặp nhật ký trong từng hướng dẫn. Mốc hoàn thành, bằng chứng và quyết định được ghi tại đây.
 
 ## 9. Rủi ro và cách xử lý
 
@@ -408,23 +406,34 @@ Khi đồng bộ, rà lại toàn bộ các chỗ đề cập “frontend” đ�
 | DEC-11 | 2026-09-19 | Giữ GPS ngoài phạm vi; tiếp tục theo dõi trạng thái phiếu, lịch sử xử lý và biến động tồn | Người dùng quyết định không bổ sung tracking GPS sau khi trao đổi phạm vi và chi phí                                                           |
 | DEC-12 | 2026-09-19 | Xem thiết kế database tổng thể 5 service trước, sau đó chi tiết và code từng phần         | Người dùng đồng ý cách làm tổng quan trước; Inventory và Transfer được thiết kế nghiệp vụ cùng nhau, triển khai từng chức năng nhỏ             |
 | DEC-13 | 2026-09-22 | Seed Admin đọc SEED*ADMIN*\* từ .env; băm bằng scrypt có sẵn trong Node.js                | Người dùng muốn file seed để tiện test API và nhớ thông tin local; không thêm dependency, không hardcode mật khẩu, không reset tài khoản đã có |
-| DEC-14 | 2026-09-23 | Chuyển ORM từ TypeORM sang Prisma, bắt đầu ở Auth                                         | Người dùng chọn Prisma. Dùng dòng 7 được hỗ trợ; giữ database/Admin và chuyển từng bước, người dùng cài dependency thủ công                    |
+| DEC-14 | 2026-09-23 | Chuyển Auth từ TypeORM sang Prisma 7, chốt 7.10.0 | Giữ dữ liệu/Admin; baseline SQL bảo toàn constraint/trigger; người dùng cài dependency thủ công |
+| DEC-15 | 2026-10-01 | Gộp tài liệu vận hành/API, đồng bộ SRS 1.2 | Người dùng cho phép chỉnh trực tiếp đợt này; chưa tách thêm BRD, UI Guidelines hoặc use case chi tiết |
 
 Khi có quyết định mới, thêm một dòng thay vì âm thầm đổi lựa chọn cũ. Nếu thay đổi yêu cầu nghiệp vụ, cập nhật cả SRS ở bước tương ứng.
 
+### Bằng chứng kiểm thử đã ghi nhận
+
+Đây là kết quả lịch sử, không phải kết quả chạy lại trong đợt dọn tài liệu. Các bộ test có thể bao gồm nhau; không cộng thành tổng ca độc lập.
+
+| Mốc | Bằng chứng |
+|---|---|
+| Schema Auth, 2026-09-22 | 39 ca PostgreSQL: constraint, audit, rollback; migration ban đầu đã chạy |
+| Seed Admin | 8 ca PostgreSQL: tạo mới, chạy lại, đồng thời và rollback; Admin local đã có |
+| Chuyển Prisma | Baseline đối chiếu trong schema tạm rồi rollback; sau chuyển đổi có 26 unit, 68 database, 1 e2e cùng build/lint đạt |
+| Login trước baseline Prisma | Báo cáo lúc triển khai ghi 26 unit, 69 database (gồm 22 ca HTTP login), 1 e2e; số ca thay đổi khi thay setup TypeORM |
+| `/api/auth/me`, 2026-09-24 | 77 ca database theo báo cáo: token, trạng thái và quyền hiện hành |
+| Gateway | Người dùng gửi kết quả 5 test đạt, 0 lỗi |
+| Web/Android | Người dùng xác nhận đăng nhập; chưa thay thế nghiệm thu đầy đủ trên APK release |
+| DBML | Kiểm tra cấu trúc ban đầu: 26 bảng, 5 nhóm, 17 FK nội bộ, 23 tham chiếu logic; sau sửa nullability/cardinality, người dùng xác nhận dbdiagram ổn ngày 2026-09-22 |
+
+Đợt tài liệu ngày 2026-10-01: `docs` còn 8 file; kiểm tra 68 liên kết/anchor nội bộ và JSON/reference OpenAPI đạt. Request/response Auth và AC-01–27 giữ nguyên; DBML, quy ước commit, Prisma schema/migration không đổi. Các lệnh trong hướng dẫn được đối chiếu với manifest. Không chạy lại test ứng dụng hoặc thao tác database trong đợt này.
+
 ## 11. Bước tiếp theo
 
-**Mốc vừa hoàn thành:** Đã triển khai `POST /api/auth/login`: username/email, kiểm tra mật khẩu và tài khoản ACTIVE, JWT HS256 có hạn 30 phút, validation và lỗi theo SRS. Đã đạt 26 unit test, 69 ca database (gồm 22 ca HTTP đăng nhập) và 1 e2e GET `/`. Khóa ký và tài khoản thử trong test độc lập với cấu hình/dữ liệu thật. FEAT-01 vẫn IN_PROGRESS vì còn thông tin tài khoản, guard/quyền hiện hành và hai giao diện.
+1. Hoàn thiện Android tải `/me` bằng TanStack Query khi trở lại foreground.
+2. Bổ sung AbortSignal, xử lý 401, lỗi mạng/server, thử lại và logout khi request đang chạy.
+3. Kiểm tra TypeScript/lint và các ca phiên trên thiết bị; cập nhật bằng chứng.
+4. Làm tải lại khi mạng phục hồi ở bước riêng.
+5. Khi phần phiên ổn định, bắt đầu quản lý người dùng theo từng chức năng nhỏ.
 
-**Mốc vừa hoàn thành: chuyển Auth sang Prisma.** Truy vấn chỉ đọc xác nhận `0_auth_baseline` đã applied. Ba bộ test database dựng schema riêng từ `migration.sql`; một ca down/up đặc thù TypeORM được bỏ. Người dùng đã gỡ hai dependency TypeORM; kiểm tra sau khi gỡ đạt 26 unit, 68 database, 1 e2e, build và lint. PREP-14 DONE. Xem [kế hoạch chuyển ORM](./docs/prisma-transition.md).
-
-**Mốc vừa hoàn thành: `GET /api/auth/me`.** Bearer JWT được xác minh tại Auth; mỗi request đọc lại trạng thái, role, kho và quyền bổ sung qua Prisma. Token sai/hết hạn, tài khoản INACTIVE và quyền bị thu hồi được kiểm tra trên PostgreSQL tạm; 77 ca database đạt. Xem [hướng dẫn `/me`](./docs/auth-me.md). FEAT-01 vẫn IN_PROGRESS cho tới khi web/Android tích hợp và kiểm thử.
-
-- Đọc [database tổng quan](./docs/database-overview.md): service sở hữu từng nhóm bảng, quan hệ nội bộ/liên service, command/result và ví dụ chuyển kho.
-- Có thể dán [database.dbml](./docs/database.dbml) vào dbdiagram để xem 26 bảng trong 5 nhóm service. Nét đứt chỉ là tham chiếu logic liên service; các cột ngoài Auth còn là đề xuất, không xuất nguyên sơ đồ thành migration.
-- DBML v0.2 sửa ký hiệu nullable và quan hệ một–một theo warning người dùng gửi từ dbdiagram; không đổi cột hoặc constraint nghiệp vụ. Người dùng đã xác nhận bản mới ổn trên dbdiagram ngày 2026-09-22.
-- Bản tổng quan ghi cả các bảng chống trùng, outbox và tham chiếu sử dụng danh mục; các đề xuất kỹ thuật và điểm nghiệp vụ còn cần chốt được ghi rõ, chưa được coi là schema đã triển khai.
-- [Thiết kế ba bảng Auth](./docs/auth-database-design.md) đã có entity và migration được kiểm tra, bảng đã tạo thành công. Giữ `synchronize: false`; triển khai tài khoản Admin/đăng nhập theo từng bước nhỏ.
-- Hoàn thiện chi tiết và triển khai theo thứ tự Auth → Product → Warehouse → Inventory và Transfer. Hai service cuối thiết kế nghiệp vụ cùng nhau, code từng chức năng.
-
-Điều kiện hoàn thành bước tổng quan: cùng thống nhất quyền sở hữu dữ liệu, các nhóm bảng, tham chiếu giữa service và luồng cập nhật chính; ghi rõ điểm cần giải quyết ở thiết kế chi tiết. PREP-05 vẫn IN_PROGRESS cho tới khi thiết kế dữ liệu và hợp đồng liên quan được hoàn thiện. Tài liệu chưa được coi là schema đã triển khai hoặc chức năng đăng nhập đã hoàn thành.
+Tiếp tục thiết kế chi tiết theo thứ tự Auth → Product → Warehouse → Inventory và Transfer. Hai service cuối thiết kế nghiệp vụ cùng nhau, code từng luồng. PREP-05 vẫn IN_PROGRESS cho tới khi schema và hợp đồng toàn hệ thống hoàn tất.

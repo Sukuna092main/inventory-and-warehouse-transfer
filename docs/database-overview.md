@@ -1,22 +1,20 @@
 # Thiết kế database tổng quan — Inventory & Warehouse Transfer System
 
-**Phiên bản:** 0.1  
-**Ngày:** 2026-09-19  
-**Trạng thái:** Bản nháp để cùng xem xét; chưa tạo database, bảng, entity hoặc migration trong bước này  
-**Căn cứ:** [SRS 1.1](../SRS_Inventory_Warehouse_Transfer_System_VI.md) và [kế hoạch phát triển](../plan.md)  
-**Thiết kế chi tiết hiện có:** [Auth — bản nháp ba bảng](./auth-database-design.md)
+**Phiên bản:** 0.2\
+**Ngày cập nhật:** 2026-10-01\
+**Trạng thái:** Thiết kế tổng quan năm service; Auth đã có Prisma schema/migration, các service còn lại là đề xuất
+**Căn cứ:** [SRS 1.2](../SRS_Inventory_Warehouse_Transfer_System_VI.md) và [kế hoạch phát triển](../plan.md)\
+**Thiết kế chi tiết hiện có:** [Auth — thiết kế chi tiết](./auth-database-design.md)
 
 **Sơ đồ để mở bằng dbdiagram:** [database.dbml](./database.dbml). Dán toàn bộ file vào trình soạn thảo DBML tại [dbdiagram.io](https://dbdiagram.io). File có 5 nhóm service; nét liền là FK nội bộ, nét đứt màu cam là tham chiếu logic liên service. Namespace `*_db` chỉ đại diện cho các database riêng trên sơ đồ, không phải quyết định gộp thành một database. Các cột ngoài Auth là đề xuất sơ bộ để trực quan hóa; không dùng SQL export toàn sơ đồ làm migration. Cú pháp theo [DBML](https://dbml.dbdiagram.io/docs/), cách nhóm/nét đứt theo [tài liệu hiển thị](https://dbml.dbdiagram.io/syntax/enrichment-visualization/).
 
-**Kiểm tra DBML ngày 2026-09-19:** kiểm tra cấu trúc cục bộ đạt 26 bảng, 5 nhóm, 17 FK nội bộ và 23 tham chiếu logic; các cột đích tồn tại, kiểu tham chiếu khớp và FK nội bộ không vượt database. Đây chưa phải kết quả chạy parser chính thức hoặc mở trên dbdiagram; không cài thêm công cụ trong bước tạo file.
-
-**DBML v0.2:** sau khi người dùng mở trên dbdiagram và báo warning, sửa ký hiệu quan hệ để khớp nullability và tính duy nhất: `?>?` cho FK nullable, quan hệ một–một tùy chọn cho kết quả operation và current operation. Giữ nguyên cột/constraint nghiệp vụ. Lần kiểm tra cấu trúc trước chưa bao phủ cardinality; bản sửa được rà thêm phần này cục bộ. Người dùng xác nhận bản mới ổn trên dbdiagram ngày 2026-09-22. Quy ước theo [tài liệu quan hệ DBML](https://docs.dbdiagram.io/relationships/).
+DBML giữ phân biệt FK nội bộ và tham chiếu logic liên service. Bằng chứng kiểm tra/dbdiagram nằm trong [kế hoạch](../plan.md).
 
 ## 1. Mục tiêu và mức độ thiết kế
 
 Tài liệu này xác định dữ liệu thuộc service nào, các nhóm bảng cần có, quan hệ và cách dữ liệu thay đổi trong một luồng chuyển kho. Sau khi thống nhất tổng thể, thiết kế chi tiết và triển khai từng phần theo thứ tự Auth → Product → Warehouse → Inventory và Transfer. Hai service cuối được thiết kế nghiệp vụ cùng nhau nhưng vẫn code từng chức năng nhỏ.
 
-Tên bảng dưới đây là đề xuất ánh xạ từ các mô hình trong SRS, không phải schema đã chạy. Kiểu dữ liệu từng cột, độ dài, index đầy đủ và SQL migration sẽ nằm trong tài liệu chi tiết của từng service. Các bảng bổ sung để thực hiện một quy tắc kỹ thuật được ghi rõ là đề xuất; không tự đổi yêu cầu nghiệp vụ của SRS.
+Các bảng Auth đã được ánh xạ bằng Prisma và migration SQL. Bảng của các service còn lại là đề xuất, chưa phải schema đã triển khai. DBML phục vụ xem quan hệ tổng thể; không xuất toàn bộ sơ đồ thành một migration hoặc tạo FK liên database. Các bảng kỹ thuật bổ sung được ghi rõ là đề xuất, không tự đổi yêu cầu nghiệp vụ.
 
 ## 2. Quyền sở hữu dữ liệu
 
@@ -46,8 +44,8 @@ Quy ước chung:
 | Bảng | Mục đích | Quan hệ và ràng buộc chính | Căn cứ |
 |---|---|---|---|
 | `users` | Tài khoản, mật khẩu đã băm, role, kho phụ trách, trạng thái | Username/email duy nhất sau chuẩn hóa; Manager/Staff bắt buộc được phân công kho | SRS 2.4, 9.1, FR-AUTH-03, BR-15 |
-| `user_permissions` | Các quyền được Admin cấp bổ sung | FK tới users; khóa ghép người dùng + quyền; quyền vẫn bị giới hạn bởi role/kho | Ánh xạ additional_permissions; bản nháp Auth mục 3 |
-| `user_audit_logs` | Ai thay đổi tài khoản/quyền, dữ liệu trước/sau và lúc nào | FK tài khoản/actor trong Auth; ghi cùng transaction; không chứa mật khẩu, hash hoặc token | SRS 9.10, NFR-06; bản nháp Auth mục 4 |
+| `user_permissions` | Các quyền được Admin cấp bổ sung | FK tới users; khóa ghép người dùng + quyền; quyền vẫn bị giới hạn bởi role/kho | Ánh xạ additional_permissions; thiết kế Auth mục 3 |
+| `user_audit_logs` | Ai thay đổi tài khoản/quyền, dữ liệu trước/sau và lúc nào | FK tài khoản/actor trong Auth; ghi cùng transaction; không chứa mật khẩu, hash hoặc token | SRS 9.10, NFR-06; thiết kế Auth mục 4 |
 
 Role cố định theo SRS, chưa cần bảng quản lý role tùy biến. Không cần bảng refresh token vì kế hoạch hiện tại chỉ dùng access token. Chi tiết ba bảng đã có trong [thiết kế Auth](./auth-database-design.md).
 
@@ -215,7 +213,7 @@ Giao thức đăng ký/xác nhận/giải phóng, chống lặp, dấu sử dụ
 | Tên danh mục trên phiếu/lịch sử | Product + Warehouse + Transfer | Thống nhất hiển thị tên hiện tại hay lưu thêm bản chụp; ID/số lượng lịch sử luôn ổn định |
 | Hợp đồng API/message và audit phục hồi | Từng chức năng, đặc biệt Transfer | Trường bắt buộc, mã lỗi, quyền, idempotency, payload bất biến và bằng chứng phục hồi theo SRS |
 
-Các điểm trên được ghi để không bỏ sót; chưa tự chọn quy tắc nghiệp vụ mới thay người dùng. Chúng không yêu cầu thiết kế hết mọi cột của bốn service còn lại trước khi làm kết nối Auth.
+Các điểm trên được ghi để không bỏ sót; chưa tự chọn quy tắc nghiệp vụ mới thay người dùng. Chúng không yêu cầu thiết kế hết mọi cột của bốn service còn lại trước khi triển khai từng service tiếp theo.
 
 ## 9. Đối chiếu phạm vi và bước tiếp theo
 
@@ -228,6 +226,6 @@ Các điểm trên được ghi để không bỏ sót; chưa tự chọn quy t�
 | SRS 7–9: retry, outbox, idempotency, phục hồi | Các bảng kỹ thuật cục bộ và kết quả operation bền vững |
 | NFR-06, AC-23/25 | Audit/actor, phân quyền, lịch sử tồn và đối chiếu hàng đang vận chuyển |
 
-Đã có bản nháp tổng quan cho cả năm service và bản nháp chi tiết Auth. PREP-05 vẫn IN_PROGRESS vì schema chi tiết và hợp đồng API/message toàn hệ thống chưa hoàn tất; chưa đánh dấu chức năng Backend/Web/Android nào DONE từ tài liệu này.
+Auth đã có ba bảng nghiệp vụ, baseline Prisma, seed Admin, login và `/api/auth/me`. Hướng dẫn vận hành nằm trong [local development](./local-development.md).
 
-Ngày 2026-09-22, Auth đã kết nối `auth_db` với `synchronize: false`, bổ sung entity/migration ba bảng và kiểm tra PostgreSQL đạt. Người dùng đã chạy migration; đã xác nhận đủ bảng và lịch sử migration theo [hướng dẫn tạo bảng Auth](./auth-database-migration.md). Bước tiếp theo là khởi tạo Admin đầu tiên rồi triển khai API đăng nhập. Việc tạo thêm database/tài khoản và cài công cụ vẫn do người dùng thực hiện thủ công theo hướng dẫn.
+Các service còn lại cần tiếp tục thiết kế chi tiết. PREP-05 vẫn IN_PROGRESS vì schema và hợp đồng API/message toàn hệ thống chưa hoàn tất. Tiến độ và bằng chứng kiểm thử được quản lý trong [kế hoạch](../plan.md).
