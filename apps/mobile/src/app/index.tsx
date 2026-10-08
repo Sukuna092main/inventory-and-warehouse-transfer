@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,13 +15,8 @@ import {
   Text,
   TextInput,
 } from "react-native-paper";
-import {
-  ApiError,
-  getMe,
-  login,
-  tokenStorage,
-  type CurrentUser,
-} from "@/lib/auth";
+import { CurrentUser } from "@/lib/auth";
+import { useAuthSession } from "@/hooks/use-auth-session";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 const roleLabels: Record<CurrentUser["role"], string> = {
@@ -37,90 +32,37 @@ const permissionLabels: Record<string, string> = {
   ADJUST_INVENTORY: "Điều chỉnh tồn kho",
 };
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Đã xảy ra lỗi. Vui lòng thử lại.";
-}
-
 export default function HomeScreen() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [restoring, setRestoring] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-
-    async function restoreSession() {
-      try {
-        const savedToken = await tokenStorage.get();
-        if (!savedToken) return;
-
-        try {
-          const currentUser = await getMe(savedToken);
-          if (active) setUser(currentUser);
-        } catch (cause) {
-          if (cause instanceof ApiError && cause.status === 401) {
-            await tokenStorage.clear();
-            if (active)
-              setError("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.");
-          } else if (active) {
-            setError(errorMessage(cause));
-          }
-        }
-      } catch (cause) {
-        if (active) setError(errorMessage(cause));
-      } finally {
-        if (active) setRestoring(false);
-      }
-    }
-
-    void restoreSession();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const {
+    hasSession,
+    user,
+    restoring,
+    busy,
+    error,
+    profileError,
+    refreshing,
+    signIn,
+    signOut,
+    retryProfile,
+  } = useAuthSession();
 
   async function handleLogin() {
-    if (!identifier.trim() || !password) {
-      setError("Nhập tài khoản và mật khẩu.");
-      return;
-    }
+    const succeeded = await signIn(identifier, password);
 
-    setBusy(true);
-    setError(null);
-
-    try {
-      const result = await login(identifier.trim(), password);
-      const currentUser = await getMe(result.accessToken);
-      await tokenStorage.set(result.accessToken);
+    if (succeeded) {
       setPassword("");
       setShowPassword(false);
-      setUser(currentUser);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(false);
     }
   }
 
   async function handleLogout() {
-    setBusy(true);
-    setError(null);
-
-    try {
-      await tokenStorage.clear();
-      setShowPassword(false);
-      setUser(null);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(false);
-    }
+    setPassword("");
+    setShowPassword(false);
+    await signOut();
   }
 
   return (
@@ -181,10 +123,70 @@ export default function HomeScreen() {
                     {busy ? "Đang đăng xuất..." : "Đăng xuất"}
                   </Button>
                 </View>
+              ) : hasSession ? (
+                <View style={styles.fields}>
+                  <Text variant="headlineSmall">Xác nhận tài khoản</Text>
+
+                  {refreshing && (
+                    <>
+                      <ActivityIndicator />
+                      <Text>Đang tải thông tin tài khoản...</Text>
+                    </>
+                  )}
+
+                  {profileError && (
+                    <>
+                      <Text style={styles.error}>{profileError}</Text>
+                      <Text>
+                        Chưa xác nhận được tài khoản và quyền. Phiên đăng nhập
+                        vẫn được giữ trên thiết bị.
+                      </Text>
+                      <Button
+                        mode="contained"
+                        disabled={busy || refreshing}
+                        onPress={retryProfile}
+                      >
+                        Thử lại
+                      </Button>
+                    </>
+                  )}
+
+                  {error && <Text style={styles.error}>{error}</Text>}
+
+                  <Button
+                    mode="outlined"
+                    disabled={busy}
+                    onPress={() => void handleLogout()}
+                  >
+                    {busy ? "Đang đăng xuất..." : "Đăng xuất"}
+                  </Button>
+                </View>
               ) : (
                 <View style={styles.fields}>
                   <Text variant="headlineMedium">Đăng nhập</Text>
                   <Text>Đăng nhập để quản lý kho và phiếu chuyển kho.</Text>
+                  {refreshing && (
+                    <Text>Đang xác nhận lại tài khoản và quyền...</Text>
+                  )}
+
+                  {profileError && (
+                    <View style={styles.fields}>
+                      <Text style={styles.error}>
+                        Chưa cập nhật được tài khoản: {profileError}
+                      </Text>
+                      <Text>
+                        Thông tin và quyền đang hiển thị là dữ liệu cũ, chưa
+                        được xác nhận lại.
+                      </Text>
+                      <Button
+                        mode="outlined"
+                        disabled={busy || refreshing}
+                        onPress={retryProfile}
+                      >
+                        Thử lại
+                      </Button>
+                    </View>
+                  )}
 
                   {error && <Text style={styles.error}>{error}</Text>}
 

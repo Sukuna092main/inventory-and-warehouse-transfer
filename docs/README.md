@@ -6,6 +6,7 @@ Inventory & Warehouse Transfer System có giao diện web và Android, dùng chu
 
 | Tài liệu | Vai trò |
 |---|---|
+| [Hướng dẫn cho agent](../AGENTS.md) | Cách làm việc với người dùng và quy trình tiếp nối khi đổi agent |
 | [SRS](../SRS_Inventory_Warehouse_Transfer_System_VI.md) | Mục tiêu, phạm vi, vai trò, yêu cầu và tiêu chí nghiệm thu |
 | [Kế hoạch](../plan.md) | Stack, kiến trúc triển khai, tiến độ, kiểm thử và nhật ký quyết định |
 | [Database tổng quan](./database-overview.md) | Quyền sở hữu dữ liệu, quan hệ và ranh giới transaction |

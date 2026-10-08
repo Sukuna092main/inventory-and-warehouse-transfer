@@ -36,16 +36,25 @@ async function requestJson<T>(path: string, options: RequestInit): Promise<T> {
   }
 
   let response: Response;
+  let rawBody: string;
+
   try {
     response = await fetch(`${baseUrl}${path}`, options);
-  } catch {
+    rawBody = await response.text();
+  } catch (error) {
+    const wasCancelled =
+      options.signal?.aborted ||
+      (error instanceof Error && error.name === "AbortError");
+
+    if (wasCancelled) {
+      throw error;
+    }
+
     throw new ApiError(
       0,
       "Không kết nối được Gateway. Kiểm tra địa chỉ máy và mạng Wi-Fi.",
     );
   }
-
-  const rawBody = await response.text();
   let body: unknown;
 
   try {
@@ -85,10 +94,11 @@ export function login(identifier: string, password: string) {
   });
 }
 
-export function getMe(token: string) {
+export function getMe(token: string, signal?: AbortSignal) {
   return requestJson<CurrentUser>("/api/auth/me", {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   });
 }
 

@@ -2,7 +2,7 @@
 
 **Nền tảng:** Web và Android\
 **Phiên bản kế hoạch:** 1.1\
-**Ngày cập nhật:** 2026-10-01\
+**Ngày cập nhật:** 2026-10-05\
 **Tài liệu nghiệp vụ hiện hành:** [SRS phiên bản 1.2](./SRS_Inventory_Warehouse_Transfer_System_VI.md)\
 **Trạng thái dự án:** Auth/Gateway đã có login và `/me`; người dùng đã xác nhận đăng nhập web/Android. Android đang tích hợp cập nhật phiên/quyền theo vòng đời ứng dụng. Các service nghiệp vụ còn lại chưa triển khai.
 **Thời gian mục tiêu:** 8 tuần, điều chỉnh theo tiến độ thực tế
@@ -241,7 +241,7 @@ Tất cả nhóm chức năng dưới đây đều có trên cả web và Androi
 | PREP-02 | Hoàn thiện `plan.md`                                 | DONE        | Tài liệu hiện tại; không bao gồm triển khai code                                                                                                                                                                                                                                                                     |
 | PREP-03 | Đồng bộ SRS lên 1.2 | DONE | 2026-10-01: kiểm tra 68 liên kết/anchor nội bộ, AC-01–27 giữ nguyên, bổ sung AC-28–31/NFR-11; hợp đồng OpenAPI không đổi |
 | PREP-04 | Giải thích và thống nhất kiến trúc chi tiết          | TODO        | Bắt đầu từ một ví dụ chuyển kho                                                                                                                                                                                                                                                                                      |
-| PREP-05 | Thiết kế dữ liệu và hợp đồng API/message | IN_PROGRESS | Có tổng quan năm service, DBML và Auth/Prisma; schema và hợp đồng các service khác chưa hoàn tất |
+| PREP-05 | Thiết kế dữ liệu và hợp đồng API/message | IN_PROGRESS | Có tổng quan năm service, DBML, Auth/Prisma và danh mục 39 API trong docs/api-guide.md; hợp đồng chi tiết/message các service khác chưa hoàn tất; quyền in-transit cần chốt |
 | PREP-06 | Danh sách màn hình và luồng điều hướng web/Android   | TODO        | Bao gồm màn hình quản trị và phục hồi                                                                                                                                                                                                                                                                                |
 | PREP-07 | Kiểm tra môi trường, chốt phiên bản dependency       | IN_PROGRESS | Node.js/pnpm và khung NestJS đã chạy; môi trường database, web, Android và bộ phiên bản toàn dự án còn cần kiểm tra                                                                                                                                                                                                  |
 | PREP-08 | Khởi tạo và chạy Auth Service                        | DONE        | Người dùng tạo bằng NestJS CLI, duyệt hai build script và cài dependency; GET http://localhost:3000 trả HTTP 200, nội dung Hello World!                                                                                                                                                                              |
@@ -428,6 +428,8 @@ Khi có quyết định mới, thêm một dòng thay vì âm thầm đổi lự
 
 Đợt tài liệu ngày 2026-10-01: `docs` còn 8 file; kiểm tra 68 liên kết/anchor nội bộ và JSON/reference OpenAPI đạt. Request/response Auth và AC-01–27 giữ nguyên; DBML, quy ước commit, Prisma schema/migration không đổi. Các lệnh trong hướng dẫn được đối chiếu với manifest. Không chạy lại test ứng dụng hoặc thao tác database trong đợt này.
 
+Đợt danh mục API ngày 2026-10-05: bổ sung [39 cặp method/endpoint](./docs/api-guide.md#2-danh-mục-api-toàn-hệ-thống), nhóm theo năm service, kèm chức năng, quyền/phạm vi kho, trạng thái và tham chiếu SRS. Login/me là 2 API DONE theo source và bằng chứng trước đó; 37 API còn lại TODO. Quyền `/api/inventory/in-transit` cần chốt khi thiết kế chức năng. PREP-05 vẫn IN_PROGRESS. Kiểm tra đạt: đủ 39 cặp duy nhất khớp SRS (8/6/6/7/12), 90 liên kết/anchor nội bộ hợp lệ và `git diff --check` không có lỗi. Hướng dẫn login/me/lỗi/phiên được giữ, chỉ đổi số mục; OpenAPI Auth không đổi. Không chạy lại kiểm thử chức năng trong đợt tài liệu này.
+
 ## 11. Bước tiếp theo
 
 1. Hoàn thiện Android tải `/me` bằng TanStack Query khi trở lại foreground.
@@ -437,3 +439,18 @@ Khi có quyết định mới, thêm một dòng thay vì âm thầm đổi lự
 5. Khi phần phiên ổn định, bắt đầu quản lý người dùng theo từng chức năng nhỏ.
 
 Tiếp tục thiết kế chi tiết theo thứ tự Auth → Product → Warehouse → Inventory và Transfer. Hai service cuối thiết kế nghiệp vụ cùng nhau, code từng luồng. PREP-05 vẫn IN_PROGRESS cho tới khi schema và hợp đồng toàn hệ thống hoàn tất.
+
+### 11.1. Bàn giao cho agent tiếp theo
+
+**Cập nhật:** 2026-10-05. Đọc [AGENTS.md](./AGENTS.md) trước khi tiếp tục. Ghi chú này cần được đối chiếu với source và yêu cầu mới nhất, không tự cấp quyền sửa code.
+
+- **Bước đang dở:** FEAT-01, cập nhật phiên/quyền Android khi trở lại foreground. Mặc định gửi code trong chat, giải thích từng file để người dùng tự áp dụng.
+- **Đã có trong source:** `apps/mobile/src/providers/query-provider.tsx` tạo QueryClient và nối AppState với focusManager; `apps/mobile/src/app/_layout.tsx` đã bọc QueryProvider. Manifest ghi TanStack Query 5.103.2.
+- **Chưa tích hợp:** `apps/mobile/src/app/index.tsx` vẫn dùng state/effect và gọi `getMe` trực tiếp; `apps/mobile/src/lib/auth.ts` có `getMe(token)` chưa nhận AbortSignal. Có QueryProvider chưa đồng nghĩa `/me` tự tải lại.
+- **Bước code tiếp theo:** thêm AbortSignal tùy chọn và xử lý hủy request đúng trong client; dùng query cho `/me`, xử lý 401/xóa phiên, lỗi mạng/server giữ token và đánh dấu dữ liệu chưa xác nhận lại, có nút thử lại. Logout phải hủy request, xóa cache và không bị response đến muộn khôi phục tài khoản.
+- **Chưa gộp vào bước này:** tự tải lại khi mạng phục hồi và quản lý người dùng; làm sau khi phần foreground ổn định.
+- **Kiểm tra cần chạy sau khi tích hợp:** TypeScript, lint, quay lại app với token hợp lệ/hết hạn, mất mạng/server lỗi, thử lại, logout lúc đang tải và đổi tài khoản. Chỉ đánh dấu phần tương ứng hoàn thành khi có kết quả thực tế.
+- **Điểm cần xác minh:** lần cài Query từng báo `ERR_PNPM_IGNORED_BUILDS` cho `unrs-resolver`; source/manifest đã có phần setup nhưng chưa có kết quả TypeScript/lint xác nhận hoàn tất bước này trong hội thoại. Đọc trạng thái hiện tại trước khi yêu cầu cài lại.
+- **Đợt vừa hoàn tất, 2026-10-05:** người dùng cho phép cập nhật trực tiếp danh mục 39 API trong `docs/api-guide.md` và ghi mốc trong kế hoạch. Đã kiểm tra số endpoint, 90 liên kết/anchor, OpenAPI và `git diff --check`; kết quả ở mục 10. Quyền sửa lần này áp dụng cho danh mục tài liệu. Việc Android cập nhật phiên/quyền vẫn đang dở như trên; không coi API DONE là chức năng hai nền tảng đã nghiệm thu.
+
+Khi chuyển bước, thay nội dung bàn giao bằng trạng thái mới; ghi kết quả kiểm thử ở mục 10 và cập nhật ma trận mục 5. Không mở thêm file tiến độ song song với kế hoạch này.
