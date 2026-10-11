@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  Link as RouterLink,
+} from "react-router";
 import {
   Alert,
   Box,
@@ -19,6 +25,7 @@ import {
 import { z } from "zod";
 import { ApiError, getMe, login } from "./api/auth";
 import type { CurrentUser, LoginInput } from "./api/auth";
+import UsersPage from "./pages/UsersPage";
 
 const loginSchema = z.object({
   identifier: z.string().trim().min(1, "Nhập username hoặc email.").max(254),
@@ -480,6 +487,17 @@ function AccountPage({
           Thông tin và quyền truy cập trong hệ thống.
         </Typography>
 
+        {user.role === "ADMIN" && (
+          <Button
+            component={RouterLink}
+            to="/users"
+            variant="outlined"
+            sx={{ mt: 3 }}
+          >
+            Quản lý người dùng
+          </Button>
+        )}
+
         <Box
           sx={{
             display: "grid",
@@ -709,11 +727,16 @@ function App() {
     }
   }
 
-  function handleLogout() {
+  const handleLogout = useCallback(() => {
     setSession(null);
     setLoginError(null);
     queryClient.clear();
-  }
+  }, [queryClient]);
+
+  const handleUnauthorized = useCallback(() => {
+    handleLogout();
+    setLoginError("Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.");
+  }, [handleLogout]);
 
   let home: React.ReactNode;
   if (!session || sessionExpired) {
@@ -745,6 +768,21 @@ function App() {
     home = <AccountPage user={account.data} onLogout={handleLogout} />;
   }
 
+  let usersView: React.ReactNode = home;
+
+  if (session && !sessionExpired && account.isSuccess) {
+    usersView =
+      account.data.role === "ADMIN" ? (
+        <UsersPage
+          token={session.token}
+          sessionId={session.id}
+          onUnauthorized={handleUnauthorized}
+        />
+      ) : (
+        <Navigate to="/" replace />
+      );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -764,6 +802,7 @@ function App() {
           }
         />
         <Route path="/" element={home} />
+        <Route path="/users" element={usersView} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -18,5 +18,6 @@ import { jwtOptions } from './jwt.config';
   ],
   controllers: [AuthController],
   providers: [AuthService, AuthPrismaService, CurrentUserGuard],
+  exports: [JwtModule, AuthPrismaService],
 })
 export class AuthModule {}

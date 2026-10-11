@@ -13,7 +13,7 @@ function errorMessage(error: unknown): string {
     : "Đã xảy ra lỗi. Vui lòng thử lại.";
 }
 
-export function useAuthSession() {
+export function useAuthSessionState() {
   const queryClient = useQueryClient();
 
   const [session, setSession] = useState<Session | null>(null);
@@ -177,6 +177,7 @@ export function useAuthSession() {
   }
 
   return {
+    session,
     hasSession: session !== null,
     user: session ? (profileQuery.data ?? null) : null,
     restoring,

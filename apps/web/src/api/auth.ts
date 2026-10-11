@@ -31,27 +31,39 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson<T>(path: string, options: RequestInit): Promise<T> {
+export async function requestJson<T>(
+  path: string,
+  options: RequestInit,
+): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(path, { ...options, cache: "no-store" });
-  } catch {
+    response = await fetch(path, {
+      ...options,
+      cache: "no-store",
+    });
+  } catch (cause) {
+    // Request bị hủy không phải lỗi mất mạng.
+    if (options.signal?.aborted) throw cause;
+
     throw new ApiError(
       0,
       "NETWORK_ERROR",
-      "KhÃ´ng káº¿t ná»‘i Ä‘Æ°á»£c Gateway. Vui lÃ²ng kiá»ƒm tra káº¿t ná»‘i rá»“i thá»­ láº¡i.",
+      "Không kết nối được Gateway. Vui lòng kiểm tra kết nối rồi thử lại.",
     );
   }
 
   let body: unknown;
+
   try {
     body = await response.json();
-  } catch {
+  } catch (cause) {
+    if (options.signal?.aborted) throw cause;
+
     throw new ApiError(
       response.status,
       "INVALID_RESPONSE",
-      "Pháº£n há»“i tá»« há»‡ thá»‘ng khÃ´ng há»£p lá»‡.",
+      "Phản hồi từ hệ thống không hợp lệ.",
     );
   }
 
@@ -66,7 +78,7 @@ async function requestJson<T>(path: string, options: RequestInit): Promise<T> {
       typeof error.code === "string" ? error.code : "REQUEST_FAILED",
       typeof error.message === "string"
         ? error.message
-        : "KhÃ´ng thá»ƒ xá»­ lÃ½ yÃªu cáº§u.",
+        : "Không thể xử lý yêu cầu.",
     );
   }
 
@@ -87,4 +99,3 @@ export function getMe(token: string): Promise<CurrentUser> {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
-

@@ -16,6 +16,8 @@ import { Roboto_700Bold } from "@expo-google-fonts/roboto/700Bold";
 
 import QueryProvider from "../providers/query-provider";
 
+import AuthProvider from "@/providers/auth-provider";
+
 void SplashScreen.preventAutoHideAsync().catch(() => {
   console.warn("Không giữ được màn hình khởi động.");
 });
@@ -133,16 +135,18 @@ export default function RootLayout() {
 
   return (
     <QueryProvider>
-      <PaperProvider theme={theme}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: theme.colors.background,
-            },
-          }}
-        />
-      </PaperProvider>
+      <AuthProvider>
+        <PaperProvider theme={theme}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: theme.colors.background,
+              },
+            }}
+          />
+        </PaperProvider>
+      </AuthProvider>
     </QueryProvider>
   );
 }

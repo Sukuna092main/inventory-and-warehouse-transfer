@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ActivityIndicator, Button, Text, TextInput } from "react-native-paper";
 import { CurrentUser } from "@/lib/auth";
-import { useAuthSession } from "@/hooks/use-auth-session";
+import { useAuthSession } from "@/providers/auth-provider";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 const roleLabels: Record<CurrentUser["role"], string> = {
