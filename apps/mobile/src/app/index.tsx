@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { router } from "expo-router";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -96,6 +97,19 @@ export default function HomeScreen() {
                     Thông tin và quyền truy cập hiện hành.
                   </Text>
                 </View>
+
+                {user.role === "ADMIN" && (
+                  <Button
+                    mode="contained"
+                    disabled={busy || Boolean(profileError)}
+                    onPress={() => router.push("/users")}
+                    style={styles.accountButton}
+                    contentStyle={styles.buttonContent}
+                    labelStyle={styles.buttonLabel}
+                  >
+                    Quản lý người dùng
+                  </Button>
+                )}
 
                 {refreshing && (
                   <View style={styles.refreshRow}>

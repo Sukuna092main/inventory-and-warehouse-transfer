@@ -176,6 +176,15 @@ export function useAuthSessionState() {
     void profileQuery.refetch();
   }
 
+  const expireSession = useCallback(
+    (expectedSessionId: number) =>
+      endSession(
+        expectedSessionId,
+        "Phiên đăng nhập không còn hợp lệ. Hãy đăng nhập lại.",
+      ),
+    [endSession],
+  );
+
   return {
     session,
     hasSession: session !== null,
@@ -189,5 +198,6 @@ export function useAuthSessionState() {
     signIn,
     signOut,
     retryProfile,
+    expireSession,
   };
 }
