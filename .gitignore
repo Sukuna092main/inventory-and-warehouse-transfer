@@ -2,3 +2,5 @@
 node_modules/
 dist/
 services/auth-service/src/generated/prisma/
+*.tsbuildinfo
+services/warehouse-service/src/generated/prisma/

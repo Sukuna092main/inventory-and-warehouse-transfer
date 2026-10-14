@@ -1,0 +1,38 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Warehouse {
+  id        String              @id(map: "pk_warehouses") @db.Uuid
+  code      String              @unique(map: "uq_warehouses_code") @db.VarChar(64)
+  name      String              @db.VarChar(255)
+  address   String              @db.Text
+  status    String              @default("ACTIVE") @db.VarChar(16)
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+  auditLogs WarehouseAuditLog[]
+
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "idx_warehouses_status_created")
+  @@map("warehouses")
+}
+
+model WarehouseAuditLog {
+  id            String    @id(map: "pk_warehouse_audit_logs") @db.Uuid
+  warehouseId   String    @map("warehouse_id") @db.Uuid
+  actorId       String    @map("actor_id") @db.Uuid
+  action        String    @db.VarChar(32)
+  beforeData    Json?     @map("before_data") @db.JsonB
+  afterData     Json      @map("after_data") @db.JsonB
+  correlationId String    @map("correlation_id") @db.VarChar(128)
+  createdAt     DateTime  @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(6)
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_warehouse_audit_warehouse")
+
+  @@index([warehouseId, createdAt(sort: Desc), id(sort: Desc)], map: "idx_warehouse_audit_created")
+  @@map("warehouse_audit_logs")
+}
